@@ -1,0 +1,19 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/spoony_dev
+    username: spoony
+    password: spoony_dev_password
+  
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: validate
+
+jwt:
+  secret: dev-secret-key-min-256-bits-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+  expiration: 86400000
+
+logging:
+  level:
+    com.spoony: DEBUG
+    org.springframework.security: DEBUG
