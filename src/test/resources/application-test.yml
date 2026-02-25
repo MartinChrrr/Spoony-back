@@ -1,0 +1,24 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password:
+    driver-class-name: org.h2.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+jwt:
+  secret: test-secret-key-for-jwt-tokens-in-tests-minimum-256-bits-xxxxxxxxx
+  expiration: 900000
+  refresh-expiration: 604800000
+
+logging:
+  level:
+    com.spoony: DEBUG
