@@ -17,6 +17,9 @@ public class UserEntity extends BaseEntity {
     @Column(name = "first_name", nullable = false, length = 100)
     private String firstName;
 
+    @Column(name = "refresh_token_hash", length = 255)
+    private String refreshTokenHash;
+
     public UserEntity() {
     }
 
@@ -48,5 +51,13 @@ public class UserEntity extends BaseEntity {
 
     public void setFirstName(String firstName) {
         this.firstName = firstName;
+    }
+
+    public String getRefreshTokenHash() {
+        return refreshTokenHash;
+    }
+
+    public void setRefreshTokenHash(String refreshTokenHash) {
+        this.refreshTokenHash = refreshTokenHash;
     }
 }
