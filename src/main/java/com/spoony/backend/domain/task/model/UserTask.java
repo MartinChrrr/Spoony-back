@@ -1,55 +1,39 @@
-package com.spoony.backend.infrastructure.persistence.entity;
-
-import com.spoony.backend.domain.task.model.TaskStatus;
-
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
-import jakarta.persistence.Table;
+package com.spoony.backend.domain.task.model;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
-@Entity
-@Table(name = "user_tasks")
-public class UserTaskEntity extends BaseEntity {
+public class UserTask {
 
-    @Column(name = "user_id", nullable = false)
+    private UUID id;
     private UUID userId;
-
-    @Column(name = "name", nullable = false, length = 255)
     private String name;
-
-    @Column(name = "spoon_cost", nullable = false)
-    private short spoonCost = 2;
-
-    @Column(name = "importance", nullable = false, length = 20)
-    private String importance = "MEDIUM";
-
-    @Column(name = "category", length = 50)
+    private int spoonCost = 2;
+    private Importance importance = Importance.MEDIUM;
     private String category;
-
-    @Column(name = "notes", columnDefinition = "TEXT")
-    private String notes;
-
-    @Column(name = "due_date", nullable = false)
     private LocalDate dueDate = LocalDate.now();
-
-    @Enumerated(EnumType.STRING)
-    @Column(name = "status", nullable = false, length = 20)
+    private String notes;
     private TaskStatus status = TaskStatus.ACTIVE;
-
-    @Column(name = "completed_at")
     private LocalDateTime completedAt;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
 
-    public UserTaskEntity() {
+    public UserTask() {
     }
 
-    public UserTaskEntity(UUID userId, String name) {
+    public UserTask(UUID id, UUID userId, String name) {
+        this.id = id;
         this.userId = userId;
         this.name = name;
+    }
+
+    public UUID getId() {
+        return id;
+    }
+
+    public void setId(UUID id) {
+        this.id = id;
     }
 
     public UUID getUserId() {
@@ -68,19 +52,19 @@ public class UserTaskEntity extends BaseEntity {
         this.name = name;
     }
 
-    public short getSpoonCost() {
+    public int getSpoonCost() {
         return spoonCost;
     }
 
-    public void setSpoonCost(short spoonCost) {
+    public void setSpoonCost(int spoonCost) {
         this.spoonCost = spoonCost;
     }
 
-    public String getImportance() {
+    public Importance getImportance() {
         return importance;
     }
 
-    public void setImportance(String importance) {
+    public void setImportance(Importance importance) {
         this.importance = importance;
     }
 
@@ -92,20 +76,20 @@ public class UserTaskEntity extends BaseEntity {
         this.category = category;
     }
 
-    public String getNotes() {
-        return notes;
-    }
-
-    public void setNotes(String notes) {
-        this.notes = notes;
-    }
-
     public LocalDate getDueDate() {
         return dueDate;
     }
 
     public void setDueDate(LocalDate dueDate) {
         this.dueDate = dueDate;
+    }
+
+    public String getNotes() {
+        return notes;
+    }
+
+    public void setNotes(String notes) {
+        this.notes = notes;
     }
 
     public TaskStatus getStatus() {
@@ -122,5 +106,21 @@ public class UserTaskEntity extends BaseEntity {
 
     public void setCompletedAt(LocalDateTime completedAt) {
         this.completedAt = completedAt;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }

@@ -1,6 +1,6 @@
 package com.spoony.backend.infrastructure.persistence.repository;
 
-import com.spoony.backend.domain.model.TaskStatus;
+import com.spoony.backend.domain.task.model.TaskStatus;
 import com.spoony.backend.infrastructure.persistence.entity.UserTaskEntity;
 import org.springframework.data.jpa.repository.JpaRepository;
 

@@ -1,4 +1,4 @@
-package com.spoony.backend.domain.model;
+package com.spoony.backend.domain.task.model;
 
 public enum TaskStatus {
     ACTIVE,
