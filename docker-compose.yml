@@ -13,7 +13,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U spoony"]
+      test: ["CMD-SHELL", "pg_isready -U spoony -d spoony_dev"]
       interval: 10s
       timeout: 5s
       retries: 5
