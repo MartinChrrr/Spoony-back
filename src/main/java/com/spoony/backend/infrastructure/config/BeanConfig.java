@@ -1,5 +1,9 @@
 package com.spoony.backend.infrastructure.config;
 
+import com.spoony.backend.domain.energy.port.in.EnergyUseCase;
+import com.spoony.backend.domain.energy.port.out.BulkPostponePort;
+import com.spoony.backend.domain.energy.port.out.EnergyPort;
+import com.spoony.backend.domain.energy.service.EnergyService;
 import com.spoony.backend.domain.task.port.in.TaskUseCase;
 import com.spoony.backend.domain.task.port.out.TaskPort;
 import com.spoony.backend.domain.task.service.TaskService;
@@ -12,5 +16,10 @@ public class BeanConfig {
     @Bean
     public TaskUseCase taskUseCase(TaskPort taskPort) {
         return new TaskService(taskPort);
+    }
+
+    @Bean
+    public EnergyUseCase energyUseCase(EnergyPort energyPort, BulkPostponePort bulkPostponePort) {
+        return new EnergyService(energyPort, bulkPostponePort);
     }
 }

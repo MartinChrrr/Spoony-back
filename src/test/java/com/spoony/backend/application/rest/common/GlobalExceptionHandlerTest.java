@@ -36,11 +36,11 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
-    void should_Return400_When_EnergyNotDeclared() {
+    void should_Return404_When_EnergyNotDeclared() {
         ResponseEntity<JSendResponse<Map<String, String>>> response =
                 handler.handleBusinessException(new EnergyNotDeclaredException());
 
-        assertThat(response.getStatusCode().value()).isEqualTo(400);
+        assertThat(response.getStatusCode().value()).isEqualTo(404);
         assertThat(response.getBody().getData().get("code")).isEqualTo("ENERGY_NOT_DECLARED");
     }
 
