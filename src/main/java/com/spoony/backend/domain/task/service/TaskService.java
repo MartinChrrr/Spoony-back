@@ -62,22 +62,6 @@ public class TaskService implements TaskUseCase {
     }
 
     @Override
-    public List<UserTask> createFromCatalog(List<UUID> baseTaskIds, UUID userId) {
-        List<UserTask> templates = taskPort.findBaseTasksByIds(baseTaskIds);
-
-        for (UserTask template : templates) {
-            template.setId(UUID.randomUUID());
-            template.setUserId(userId);
-            template.setStatus(TaskStatus.ACTIVE);
-            template.setDueDate(LocalDate.now());
-        }
-
-        List<UserTask> saved = taskPort.saveAll(templates);
-        log.info("Tasks created from catalog userId={} count={}", userId, saved.size());
-        return saved;
-    }
-
-    @Override
     public UserTask update(UUID id, UserTask task, UUID userId) {
         UserTask existing = taskPort.findById(id)
                 .filter(t -> t.getUserId().equals(userId))

@@ -16,11 +16,7 @@ public interface TaskPort {
 
     Optional<UserTask> findById(UUID id);
 
-    List<UserTask> findBaseTasksByIds(List<UUID> baseTaskIds);
-
     UserTask save(UserTask task);
-
-    List<UserTask> saveAll(List<UserTask> tasks);
 
     void deleteById(UUID id);
 }

@@ -16,8 +16,6 @@ public interface TaskUseCase {
 
     UserTask create(UserTask task, UUID userId);
 
-    List<UserTask> createFromCatalog(List<UUID> baseTaskIds, UUID userId);
-
     UserTask update(UUID id, UserTask task, UUID userId);
 
     void delete(UUID id, UUID userId);

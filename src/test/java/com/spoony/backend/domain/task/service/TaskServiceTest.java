@@ -166,31 +166,6 @@ class TaskServiceTest {
     }
 
     @Test
-    void should_CreateFromCatalog_When_ValidBaseTaskIds() {
-        // Arrange
-        UUID userId = UUID.randomUUID();
-        UUID baseId1 = UUID.randomUUID();
-        UUID baseId2 = UUID.randomUUID();
-        UserTask template1 = createTask("Courses", 3, Importance.HIGH);
-        template1.setCategory("ALIMENTATION");
-        UserTask template2 = createTask("Ménage", 2, Importance.MEDIUM);
-        template2.setCategory("MENAGE");
-        when(taskPort.findBaseTasksByIds(List.of(baseId1, baseId2))).thenReturn(List.of(template1, template2));
-        when(taskPort.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
-
-        // Act
-        List<UserTask> result = taskService.createFromCatalog(List.of(baseId1, baseId2), userId);
-
-        // Assert
-        assertThat(result).hasSize(2);
-        assertThat(result).allSatisfy(task -> {
-            assertThat(task.getUserId()).isEqualTo(userId);
-            assertThat(task.getId()).isNotNull();
-            assertThat(task.getStatus()).isEqualTo(TaskStatus.ACTIVE);
-        });
-    }
-
-    @Test
     void should_UpdateTask_When_TaskExists() {
         // Arrange
         UUID taskId = UUID.randomUUID();

@@ -69,19 +69,6 @@ public class TaskController {
         return ResponseEntity.status(HttpStatus.CREATED).body(JSendResponse.success(TaskResponse.fromDomain(created)));
     }
 
-    @PostMapping("/from-catalog")
-    @Operation(summary = "Créer depuis le catalogue", description = "Crée des tâches à partir de modèles du catalogue")
-    @ApiResponse(responseCode = "201", description = "Tâches créées depuis le catalogue")
-    @ApiResponse(responseCode = "400", description = "Erreur de validation")
-    public ResponseEntity<JSendResponse<List<TaskResponse>>> createFromCatalog(
-            @Valid @RequestBody CreateTasksFromCatalogRequest request) {
-        UUID userId = getCurrentUserId();
-        List<TaskResponse> tasks = taskUseCase.createFromCatalog(request.getBaseTaskIds(), userId).stream()
-                .map(TaskResponse::fromDomain)
-                .toList();
-        return ResponseEntity.status(HttpStatus.CREATED).body(JSendResponse.success(tasks));
-    }
-
     @PutMapping("/{id}")
     @Operation(summary = "Modifier une tâche", description = "Met à jour les champs fournis d'une tâche existante")
     @ApiResponse(responseCode = "200", description = "Tâche mise à jour")
