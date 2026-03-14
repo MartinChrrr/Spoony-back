@@ -32,6 +32,9 @@ public class UserTaskLogEntity extends BaseEntity {
     @Column(name = "status", nullable = false, length = 20)
     private TaskLogStatus status = TaskLogStatus.PLANNED;
 
+    @Column(name = "suggested", nullable = false)
+    private boolean suggested = true;
+
     @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
@@ -74,6 +77,14 @@ public class UserTaskLogEntity extends BaseEntity {
 
     public void setStatus(TaskLogStatus status) {
         this.status = status;
+    }
+
+    public boolean isSuggested() {
+        return suggested;
+    }
+
+    public void setSuggested(boolean suggested) {
+        this.suggested = suggested;
     }
 
     public LocalDateTime getCompletedAt() {

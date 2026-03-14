@@ -15,6 +15,7 @@ public final class TaskLogMapper {
         log.setUserTaskId(entity.getUserTaskId());
         log.setDate(entity.getDate());
         log.setStatus(entity.getStatus());
+        log.setSuggested(entity.isSuggested());
         log.setCompletedAt(entity.getCompletedAt());
         log.setCreatedAt(entity.getCreatedAt());
         log.setUpdatedAt(entity.getUpdatedAt());
@@ -28,6 +29,7 @@ public final class TaskLogMapper {
         entity.setUserTaskId(log.getUserTaskId());
         entity.setDate(log.getDate());
         entity.setStatus(log.getStatus());
+        entity.setSuggested(log.isSuggested());
         entity.setCompletedAt(log.getCompletedAt());
         return entity;
     }

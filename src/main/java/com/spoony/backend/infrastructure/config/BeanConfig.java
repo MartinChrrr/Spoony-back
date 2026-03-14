@@ -7,6 +7,9 @@ import com.spoony.backend.domain.energy.service.EnergyService;
 import com.spoony.backend.domain.task.port.in.TaskUseCase;
 import com.spoony.backend.domain.task.port.out.TaskPort;
 import com.spoony.backend.domain.task.service.TaskService;
+import com.spoony.backend.domain.tasklog.port.in.TaskLogUseCase;
+import com.spoony.backend.domain.tasklog.port.out.TaskLogPort;
+import com.spoony.backend.domain.tasklog.service.TaskLogService;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -21,5 +24,10 @@ public class BeanConfig {
     @Bean
     public EnergyUseCase energyUseCase(EnergyPort energyPort, BulkPostponePort bulkPostponePort) {
         return new EnergyService(energyPort, bulkPostponePort);
+    }
+
+    @Bean
+    public TaskLogUseCase taskLogUseCase(TaskLogPort taskLogPort, EnergyPort energyPort) {
+        return new TaskLogService(taskLogPort, energyPort);
     }
 }
