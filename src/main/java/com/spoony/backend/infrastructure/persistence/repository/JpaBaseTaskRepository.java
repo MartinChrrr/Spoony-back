@@ -9,4 +9,6 @@ import java.util.UUID;
 public interface JpaBaseTaskRepository extends JpaRepository<BaseTaskEntity, UUID> {
 
     List<BaseTaskEntity> findByActiveTrue();
+
+    List<BaseTaskEntity> findByActiveTrueAndCategory(String category);
 }
