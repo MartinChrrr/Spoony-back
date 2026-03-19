@@ -45,6 +45,15 @@ class DefaultSuggestionStrategyTest {
         assertThat(result).isEmpty();
     }
 
+    @Test
+    void should_ReturnEmpty_When_ZeroSpoons() {
+        UserTask task = createTask("T", 1, Importance.LOW);
+
+        List<Suggestion> result = strategy.suggest(List.of(task), 0, Map.of());
+
+        assertThat(result).isEmpty();
+    }
+
     // --- scoring ---
 
     @Test
