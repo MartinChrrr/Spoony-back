@@ -7,10 +7,10 @@ import com.spoony.backend.domain.tasklog.model.TaskLogStatus;
 import com.spoony.backend.domain.tasklog.model.UserTaskLog;
 import com.spoony.backend.domain.tasklog.port.in.TaskLogUseCase;
 import com.spoony.backend.domain.tasklog.port.out.TaskLogPort;
-import com.spoony.backend.infrastructure.exception.EnergyNotDeclaredException;
-import com.spoony.backend.infrastructure.exception.NoActiveTasksException;
-import com.spoony.backend.infrastructure.exception.TaskLogExpiredException;
-import com.spoony.backend.infrastructure.exception.TaskLogNotFoundException;
+import com.spoony.backend.domain.shared.exception.EnergyNotDeclaredException;
+import com.spoony.backend.domain.shared.exception.NoActiveTasksException;
+import com.spoony.backend.domain.shared.exception.TaskLogExpiredException;
+import com.spoony.backend.domain.shared.exception.TaskLogNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

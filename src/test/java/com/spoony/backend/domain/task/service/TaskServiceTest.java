@@ -3,8 +3,9 @@ package com.spoony.backend.domain.task.service;
 import com.spoony.backend.domain.task.model.Importance;
 import com.spoony.backend.domain.task.model.TaskStatus;
 import com.spoony.backend.domain.task.model.UserTask;
+import com.spoony.backend.domain.task.port.out.BaseTaskPort;
 import com.spoony.backend.domain.task.port.out.TaskPort;
-import com.spoony.backend.infrastructure.exception.TaskNotFoundException;
+import com.spoony.backend.domain.shared.exception.TaskNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -28,11 +29,14 @@ class TaskServiceTest {
     @Mock
     private TaskPort taskPort;
 
+    @Mock
+    private BaseTaskPort baseTaskPort;
+
     private TaskService taskService;
 
     @BeforeEach
     void setUp() {
-        taskService = new TaskService(taskPort);
+        taskService = new TaskService(taskPort, baseTaskPort);
     }
 
     @Test

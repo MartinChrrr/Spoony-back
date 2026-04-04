@@ -14,6 +14,10 @@ jwt:
   expiration: 86400000
   refresh-expiration: 604800000
 
+app:
+  cors:
+    allowed-origins: http://localhost:3000,http://localhost:8081,http://localhost:19006
+
 logging:
   level:
     com.spoony: DEBUG

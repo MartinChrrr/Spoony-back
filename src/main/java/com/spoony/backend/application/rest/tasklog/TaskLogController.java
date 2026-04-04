@@ -12,7 +12,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.transaction.annotation.Transactional;
+
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -73,7 +73,6 @@ public class TaskLogController {
     }
 
     @PatchMapping("/{id}/status")
-    @Transactional
     @Operation(
             summary = "Changer le statut d'un log",
             description = "Met à jour le statut. Si COMPLETED : incrémente spoonsUsed. Si sort de COMPLETED : décrémente. Règle J+1."

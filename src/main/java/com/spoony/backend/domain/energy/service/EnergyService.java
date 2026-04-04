@@ -4,8 +4,8 @@ import com.spoony.backend.domain.energy.model.DailyEnergy;
 import com.spoony.backend.domain.energy.port.in.EnergyUseCase;
 import com.spoony.backend.domain.energy.port.out.BulkPostponePort;
 import com.spoony.backend.domain.energy.port.out.EnergyPort;
-import com.spoony.backend.infrastructure.exception.EnergyAlreadyDeclaredException;
-import com.spoony.backend.infrastructure.exception.EnergyNotDeclaredException;
+import com.spoony.backend.domain.shared.exception.EnergyAlreadyDeclaredException;
+import com.spoony.backend.domain.shared.exception.EnergyNotDeclaredException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

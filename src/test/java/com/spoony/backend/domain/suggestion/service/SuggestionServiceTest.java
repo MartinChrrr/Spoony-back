@@ -9,7 +9,7 @@ import com.spoony.backend.domain.task.model.Importance;
 import com.spoony.backend.domain.task.model.TaskStatus;
 import com.spoony.backend.domain.task.model.UserTask;
 import com.spoony.backend.domain.task.port.out.TaskPort;
-import com.spoony.backend.infrastructure.exception.EnergyNotDeclaredException;
+import com.spoony.backend.domain.shared.exception.EnergyNotDeclaredException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;

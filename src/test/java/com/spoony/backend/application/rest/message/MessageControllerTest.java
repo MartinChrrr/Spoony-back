@@ -1,6 +1,6 @@
 package com.spoony.backend.application.rest.message;
 
-import com.spoony.backend.infrastructure.exception.MessageNotFoundException;
+import com.spoony.backend.domain.shared.exception.MessageNotFoundException;
 import com.spoony.backend.infrastructure.persistence.entity.BenevolentMessageEntity;
 import com.spoony.backend.infrastructure.persistence.repository.JpaBenevolentMessageRepository;
 import org.junit.jupiter.api.BeforeEach;

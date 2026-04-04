@@ -1,4 +1,4 @@
-package com.spoony.backend.infrastructure.exception;
+package com.spoony.backend.domain.shared.exception;
 
 public class EnergyAlreadyDeclaredException extends BusinessException {
 

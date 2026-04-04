@@ -26,6 +26,9 @@ public class DailyEnergyEntity extends BaseEntity {
     @Column(name = "spoons_used", nullable = false)
     private short spoonsUsed = 0;
 
+    @Column(name = "mood_start", length = 50)
+    private String moodStart;
+
     @Column(name = "end_of_day_mood", length = 50)
     private String endOfDayMood;
 
@@ -68,6 +71,14 @@ public class DailyEnergyEntity extends BaseEntity {
 
     public void setSpoonsUsed(short spoonsUsed) {
         this.spoonsUsed = spoonsUsed;
+    }
+
+    public String getMoodStart() {
+        return moodStart;
+    }
+
+    public void setMoodStart(String moodStart) {
+        this.moodStart = moodStart;
     }
 
     public String getEndOfDayMood() {

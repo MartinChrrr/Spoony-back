@@ -1,7 +1,7 @@
 package com.spoony.backend.application.auth;
 
-import com.spoony.backend.infrastructure.exception.EmailAlreadyExistsException;
-import com.spoony.backend.infrastructure.exception.InvalidCredentialsException;
+import com.spoony.backend.domain.shared.exception.EmailAlreadyExistsException;
+import com.spoony.backend.domain.shared.exception.InvalidCredentialsException;
 import com.spoony.backend.infrastructure.persistence.entity.UserEntity;
 import com.spoony.backend.infrastructure.persistence.repository.JpaUserRepository;
 import com.spoony.backend.infrastructure.security.JwtTokenProvider;

@@ -1,6 +1,6 @@
 package com.spoony.backend.application.rest.common;
 
-import com.spoony.backend.infrastructure.exception.BusinessException;
+import com.spoony.backend.domain.shared.exception.BusinessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
@@ -46,6 +46,14 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .badRequest()
                 .body(JSendResponse.fail("VALIDATION_ERROR", message));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<JSendResponse<Map<String, String>>> handleIllegalArgumentException(IllegalArgumentException ex) {
+        log.warn("Invalid argument: {}", ex.getMessage());
+        return ResponseEntity
+                .badRequest()
+                .body(JSendResponse.fail("INVALID_ENUM", ex.getMessage()));
     }
 
     @ExceptionHandler(Exception.class)

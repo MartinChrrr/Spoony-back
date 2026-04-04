@@ -50,6 +50,17 @@ public class TaskAdapter implements TaskPort {
     }
 
     @Override
+    public List<UserTask> saveAll(List<UserTask> tasks) {
+        List<UserTaskEntity> entities = tasks.stream()
+                .map(TaskMapper::toEntity)
+                .toList();
+        List<UserTaskEntity> saved = userTaskRepository.saveAll(entities);
+        return saved.stream()
+                .map(TaskMapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public void deleteById(UUID id) {
         userTaskRepository.deleteById(id);
     }

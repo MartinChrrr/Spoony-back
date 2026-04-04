@@ -1,7 +1,7 @@
 package com.spoony.backend.application.auth;
 
-import com.spoony.backend.infrastructure.exception.EmailAlreadyExistsException;
-import com.spoony.backend.infrastructure.exception.InvalidCredentialsException;
+import com.spoony.backend.domain.shared.exception.EmailAlreadyExistsException;
+import com.spoony.backend.domain.shared.exception.InvalidCredentialsException;
 import com.spoony.backend.infrastructure.persistence.entity.UserEntity;
 import com.spoony.backend.infrastructure.persistence.repository.JpaUserRepository;
 import com.spoony.backend.infrastructure.security.JwtTokenProvider;
@@ -52,6 +52,7 @@ public class AuthService {
         return generateTokens(user);
     }
 
+    @Transactional
     public AuthResponse login(LoginRequest request) {
         UserEntity user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(InvalidCredentialsException::new);
@@ -101,7 +102,7 @@ public class AuthService {
         user.setRefreshTokenHash(hashToken(refreshToken));
         userRepository.save(user);
 
-        return new AuthResponse(accessToken, refreshToken);
+        return new AuthResponse(accessToken, refreshToken, user.getId(), user.getFirstName());
     }
 
     private String hashToken(String token) {

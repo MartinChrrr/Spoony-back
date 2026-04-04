@@ -15,6 +15,7 @@ public final class EnergyMapper {
         energy.setDate(entity.getDate());
         energy.setSpoons(entity.getSpoons());
         energy.setSpoonsUsed(entity.getSpoonsUsed());
+        energy.setMoodStart(entity.getMoodStart());
         energy.setMoodEnd(entity.getEndOfDayMood());
         energy.setCreatedAt(entity.getCreatedAt());
         energy.setUpdatedAt(entity.getUpdatedAt());
@@ -28,6 +29,7 @@ public final class EnergyMapper {
         entity.setDate(energy.getDate());
         entity.setSpoons((short) energy.getSpoons());
         entity.setSpoonsUsed((short) energy.getSpoonsUsed());
+        entity.setMoodStart(energy.getMoodStart());
         entity.setEndOfDayMood(energy.getMoodEnd());
         return entity;
     }

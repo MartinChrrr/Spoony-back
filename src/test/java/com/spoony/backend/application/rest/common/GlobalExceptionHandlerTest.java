@@ -1,13 +1,13 @@
 package com.spoony.backend.application.rest.common;
 
-import com.spoony.backend.infrastructure.exception.EmailAlreadyExistsException;
-import com.spoony.backend.infrastructure.exception.EnergyAlreadyDeclaredException;
-import com.spoony.backend.infrastructure.exception.EnergyNotDeclaredException;
-import com.spoony.backend.infrastructure.exception.InvalidCredentialsException;
-import com.spoony.backend.infrastructure.exception.NoActiveTasksException;
-import com.spoony.backend.infrastructure.exception.TaskLogExpiredException;
-import com.spoony.backend.infrastructure.exception.TaskLogNotFoundException;
-import com.spoony.backend.infrastructure.exception.TaskNotFoundException;
+import com.spoony.backend.domain.shared.exception.EmailAlreadyExistsException;
+import com.spoony.backend.domain.shared.exception.EnergyAlreadyDeclaredException;
+import com.spoony.backend.domain.shared.exception.EnergyNotDeclaredException;
+import com.spoony.backend.domain.shared.exception.InvalidCredentialsException;
+import com.spoony.backend.domain.shared.exception.NoActiveTasksException;
+import com.spoony.backend.domain.shared.exception.TaskLogExpiredException;
+import com.spoony.backend.domain.shared.exception.TaskLogNotFoundException;
+import com.spoony.backend.domain.shared.exception.TaskNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.ResponseEntity;

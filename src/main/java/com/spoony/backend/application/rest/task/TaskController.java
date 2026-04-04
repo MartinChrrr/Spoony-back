@@ -1,9 +1,10 @@
 package com.spoony.backend.application.rest.task;
 
 import com.spoony.backend.application.rest.common.JSendResponse;
+import com.spoony.backend.domain.task.model.TaskFromCatalogCommand;
 import com.spoony.backend.domain.task.model.UserTask;
 import com.spoony.backend.domain.task.port.in.TaskUseCase;
-import com.spoony.backend.infrastructure.exception.TaskNotFoundException;
+import com.spoony.backend.domain.shared.exception.TaskNotFoundException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -80,6 +81,23 @@ public class TaskController {
         UUID userId = getCurrentUserId();
         UserTask updated = taskUseCase.update(id, request.toDomain(), userId);
         return ResponseEntity.ok(JSendResponse.success(TaskResponse.fromDomain(updated)));
+    }
+
+    @PostMapping("/from-catalog")
+    @Operation(summary = "Créer des tâches depuis le catalogue", description = "Crée des tâches utilisateur à partir de tâches prédéfinies du catalogue")
+    @ApiResponse(responseCode = "201", description = "Tâches créées")
+    @ApiResponse(responseCode = "400", description = "Erreur de validation")
+    @ApiResponse(responseCode = "404", description = "Tâche de base non trouvée")
+    public ResponseEntity<JSendResponse<List<TaskResponse>>> createFromCatalog(
+            @Valid @RequestBody CreateTasksFromCatalogRequest request) {
+        UUID userId = getCurrentUserId();
+        List<TaskFromCatalogCommand> commands = request.getTasks().stream()
+                .map(item -> new TaskFromCatalogCommand(item.getBaseTaskId(), item.getName()))
+                .toList();
+        List<TaskResponse> tasks = taskUseCase.createFromCatalog(commands, userId).stream()
+                .map(TaskResponse::fromDomain)
+                .toList();
+        return ResponseEntity.status(HttpStatus.CREATED).body(JSendResponse.success(tasks));
     }
 
     @DeleteMapping("/{id}")

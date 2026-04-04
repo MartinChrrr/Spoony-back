@@ -9,7 +9,7 @@ import com.spoony.backend.domain.suggestion.strategy.SuggestionStrategy;
 import com.spoony.backend.domain.task.model.TaskStatus;
 import com.spoony.backend.domain.task.model.UserTask;
 import com.spoony.backend.domain.task.port.out.TaskPort;
-import com.spoony.backend.infrastructure.exception.EnergyNotDeclaredException;
+import com.spoony.backend.domain.shared.exception.EnergyNotDeclaredException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
