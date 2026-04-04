@@ -10,6 +10,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 
@@ -30,6 +32,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request,
                                     HttpServletResponse response,
                                     FilterChain filterChain) throws ServletException, IOException {
+        evictExpiredEntries();
+
         String clientIp = getClientIp(request);
         RateWindow window = windows.compute(clientIp, (key, existing) -> {
             long now = System.currentTimeMillis();
@@ -53,11 +57,20 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private String getClientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
-        }
+        // Use remoteAddr only — X-Forwarded-For is handled by the reverse proxy
+        // and Spring's ForwardedHeaderFilter if configured. Do not trust raw headers.
         return request.getRemoteAddr();
+    }
+
+    private void evictExpiredEntries() {
+        long now = System.currentTimeMillis();
+        Iterator<Map.Entry<String, RateWindow>> it = windows.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<String, RateWindow> entry = it.next();
+            if (now - entry.getValue().windowStart > WINDOW_MS) {
+                it.remove();
+            }
+        }
     }
 
     private static class RateWindow {
