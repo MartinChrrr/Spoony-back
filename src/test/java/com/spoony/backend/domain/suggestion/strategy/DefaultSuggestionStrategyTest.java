@@ -160,7 +160,7 @@ class DefaultSuggestionStrategyTest {
 
         List<Suggestion> result = strategy.suggest(List.of(task), 8, Map.of());
 
-        assertThat(result.get(0).getReason()).startsWith("Haute priorité");
+        assertThat(result.get(0).getReason()).startsWith("HIGH.");
     }
 
     // --- importance value ---
