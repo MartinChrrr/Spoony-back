@@ -89,22 +89,18 @@ public class DefaultSuggestionStrategy implements SuggestionStrategy {
     }
 
     private String buildReason(Importance importance, long daysSinceCompletion) {
-        String level = switch (importance) {
-            case HIGH -> "Haute priorité";
-            case MEDIUM -> "Priorité moyenne";
-            case LOW -> "Faible priorité";
-        };
+        String level = importance.name();
 
         if (daysSinceCompletion >= 30) {
-            return level + ", jamais complétée";
+            return level + ".NEVER_COMPLETED";
         }
         if (daysSinceCompletion == 0) {
-            return level + ", complétée aujourd'hui";
+            return level + ".COMPLETED_TODAY";
         }
         if (daysSinceCompletion == 1) {
-            return level + ", complétée hier";
+            return level + ".COMPLETED_YESTERDAY";
         }
-        return level + ", pas faite depuis " + daysSinceCompletion + " jours";
+        return level + ".NOT_DONE_SINCE:days=" + daysSinceCompletion;
     }
 
     private record ScoredTask(UserTask task, double score, String reason) {
