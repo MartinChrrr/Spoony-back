@@ -10,6 +10,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -26,7 +27,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/task-logs")
+@RequestMapping(value = "/api/task-logs", produces = MediaType.APPLICATION_JSON_VALUE)
 @Tag(name = "TaskLogs", description = "Gestion des logs de tâches quotidiens")
 public class TaskLogController {
 

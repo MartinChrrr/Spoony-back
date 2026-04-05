@@ -5,6 +5,7 @@ import com.spoony.backend.domain.suggestion.port.in.SuggestionUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,7 +16,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/suggestions")
+@RequestMapping(value = "/api/suggestions", produces = MediaType.APPLICATION_JSON_VALUE)
 @Tag(name = "Suggestions", description = "Suggestions de tâches basées sur l'énergie et la priorité")
 public class SuggestionController {
 
