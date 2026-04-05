@@ -1,15 +1,26 @@
 package com.spoony.backend.application.rest.basetask;
 
 import com.spoony.backend.infrastructure.persistence.entity.BaseTaskEntity;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.UUID;
 
+@Schema(description = "Tâche prédéfinie du catalogue")
 public class BaseTaskResponse {
 
+    @Schema(description = "Identifiant unique", example = "550e8400-e29b-41d4-a716-446655440000")
     private UUID id;
+
+    @Schema(description = "Clé i18n de la tâche", example = "tasks.household.groceries")
     private String key;
+
+    @Schema(description = "Coût en cuillères", example = "3", minimum = "1", maximum = "5")
     private int spoonCost;
+
+    @Schema(description = "Niveau d'importance", example = "MEDIUM", allowableValues = {"LOW", "MEDIUM", "HIGH"})
     private String importance;
+
+    @Schema(description = "Catégorie de la tâche", example = "household")
     private String category;
 
     public BaseTaskResponse() {

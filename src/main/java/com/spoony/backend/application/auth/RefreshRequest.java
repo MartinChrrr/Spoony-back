@@ -1,9 +1,12 @@
 package com.spoony.backend.application.auth;
 
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 
+@Schema(description = "Requête de rafraîchissement de token")
 public class RefreshRequest {
 
+    @Schema(description = "Token de rafraîchissement", example = "dGhpcyBpcyBhIHJlZnJlc2g...", requiredMode = Schema.RequiredMode.REQUIRED)
     @NotBlank(message = "Le refresh token est obligatoire")
     private String refreshToken;
 

@@ -1,23 +1,46 @@
 package com.spoony.backend.application.rest.task;
 
 import com.spoony.backend.domain.task.model.UserTask;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+@Schema(description = "Tâche utilisateur")
 public class TaskResponse {
 
+    @Schema(description = "Identifiant unique de la tâche", example = "550e8400-e29b-41d4-a716-446655440000")
     private UUID id;
+
+    @Schema(description = "Nom de la tâche", example = "Faire les courses")
     private String name;
+
+    @Schema(description = "Coût en cuillères", example = "3", minimum = "1", maximum = "5")
     private int spoonCost;
+
+    @Schema(description = "Niveau d'importance", example = "MEDIUM", allowableValues = {"LOW", "MEDIUM", "HIGH"})
     private String importance;
+
+    @Schema(description = "Catégorie de la tâche", example = "household")
     private String category;
+
+    @Schema(description = "Date d'échéance", example = "2026-04-05")
     private LocalDate dueDate;
+
+    @Schema(description = "Notes libres", example = "Ne pas oublier le lait")
     private String notes;
+
+    @Schema(description = "Statut de la tâche", example = "ACTIVE", allowableValues = {"ACTIVE", "ARCHIVED"})
     private String status;
+
+    @Schema(description = "Date de complétion")
     private LocalDateTime completedAt;
+
+    @Schema(description = "Date de création")
     private LocalDateTime createdAt;
+
+    @Schema(description = "Date de dernière modification")
     private LocalDateTime updatedAt;
 
     public TaskResponse() {

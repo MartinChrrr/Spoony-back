@@ -1,12 +1,17 @@
 package com.spoony.backend.application.rest.tasklog;
 
 import com.spoony.backend.domain.tasklog.model.BulkPostponeResult;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDate;
 
+@Schema(description = "Résultat du report en masse")
 public class BulkPostponeResponse {
 
+    @Schema(description = "Nombre de tâches reportées", example = "5")
     private int postponedCount;
+
+    @Schema(description = "Nouvelle date des tâches reportées", example = "2026-04-06")
     private LocalDate newDate;
 
     public BulkPostponeResponse() {

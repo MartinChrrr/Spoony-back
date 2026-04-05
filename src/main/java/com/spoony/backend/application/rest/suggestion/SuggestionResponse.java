@@ -1,16 +1,29 @@
 package com.spoony.backend.application.rest.suggestion;
 
 import com.spoony.backend.domain.suggestion.model.Suggestion;
+import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.UUID;
 
+@Schema(description = "Suggestion de tâche basée sur l'énergie et la priorité")
 public class SuggestionResponse {
 
+    @Schema(description = "Identifiant de la tâche utilisateur", example = "550e8400-e29b-41d4-a716-446655440000")
     private UUID userTaskId;
+
+    @Schema(description = "Nom de la tâche", example = "Faire les courses")
     private String name;
+
+    @Schema(description = "Coût en cuillères", example = "3", minimum = "1", maximum = "5")
     private int spoonCost;
+
+    @Schema(description = "Niveau d'importance", example = "HIGH", allowableValues = {"LOW", "MEDIUM", "HIGH"})
     private String importance;
+
+    @Schema(description = "Clé i18n de la raison de suggestion (format: IMPORTANCE.STATUS[:days=N])", example = "HIGH.NOT_DONE_SINCE:days=5")
     private String reason;
+
+    @Schema(description = "Indique si cette tâche dépasse le budget de cuillères restant", example = "false")
     private boolean exceedsBudget;
 
     public SuggestionResponse() {
