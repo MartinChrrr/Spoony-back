@@ -1,5 +1,6 @@
 package com.spoony.backend.infrastructure.security;
 
+import com.spoony.backend.infrastructure.persistence.repository.JpaUserRepository;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,9 +25,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private static final Logger log = LoggerFactory.getLogger(JwtAuthenticationFilter.class);
 
     private final JwtTokenProvider jwtTokenProvider;
+    private final JpaUserRepository userRepository;
 
-    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider) {
+    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider,
+                                   JpaUserRepository userRepository) {
         this.jwtTokenProvider = jwtTokenProvider;
+        this.userRepository = userRepository;
     }
 
     @Override
@@ -42,6 +46,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
             if ("access".equals(tokenType)) {
                 UUID userId = jwtTokenProvider.getUserIdFromToken(token);
+
+                // RGPD : invalidation immédiate post-suppression de compte.
+                // PK lookup (SELECT 1 WHERE id=?), acceptable à charge modérée.
+                // Si le volume dépasse ~500 req/s, ajouter un cache Caffeine (TTL 60s).
+                if (!userRepository.existsById(userId)) {
+                    log.debug("Utilisateur inexistant userId={}, token rejeté", userId);
+                    filterChain.doFilter(request, response);
+                    return;
+                }
 
                 UsernamePasswordAuthenticationToken authentication =
                         new UsernamePasswordAuthenticationToken(

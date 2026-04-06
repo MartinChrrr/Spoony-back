@@ -15,4 +15,6 @@ public interface JpaUserTaskRepository extends JpaRepository<UserTaskEntity, UUI
     List<UserTaskEntity> findByUserIdAndDueDateBeforeAndStatus(UUID userId, LocalDate date, TaskStatus status);
 
     List<UserTaskEntity> findByUserIdAndStatusAndDueDate(UUID userId, TaskStatus status, LocalDate dueDate);
+
+    List<UserTaskEntity> findByUserId(UUID userId);
 }

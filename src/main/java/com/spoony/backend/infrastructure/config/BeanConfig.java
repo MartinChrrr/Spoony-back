@@ -17,8 +17,10 @@ import com.spoony.backend.domain.suggestion.service.SuggestionService;
 import com.spoony.backend.domain.suggestion.strategy.DefaultSuggestionStrategy;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.annotation.EnableScheduling;
 
 @Configuration
+@EnableScheduling
 public class BeanConfig {
 
     @Bean

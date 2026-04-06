@@ -4,6 +4,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 
+import java.time.LocalDateTime;
+
 @Entity
 @Table(name = "users")
 public class UserEntity extends BaseEntity {
@@ -19,6 +21,9 @@ public class UserEntity extends BaseEntity {
 
     @Column(name = "refresh_token_hash", length = 255)
     private String refreshTokenHash;
+
+    @Column(name = "last_login_at")
+    private LocalDateTime lastLoginAt;
 
     public UserEntity() {
     }
@@ -59,5 +64,13 @@ public class UserEntity extends BaseEntity {
 
     public void setRefreshTokenHash(String refreshTokenHash) {
         this.refreshTokenHash = refreshTokenHash;
+    }
+
+    public LocalDateTime getLastLoginAt() {
+        return lastLoginAt;
+    }
+
+    public void setLastLoginAt(LocalDateTime lastLoginAt) {
+        this.lastLoginAt = lastLoginAt;
     }
 }

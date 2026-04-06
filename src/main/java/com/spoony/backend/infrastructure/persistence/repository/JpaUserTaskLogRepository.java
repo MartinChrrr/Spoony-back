@@ -24,4 +24,6 @@ public interface JpaUserTaskLogRepository extends JpaRepository<UserTaskLogEntit
             "WHERE utl.userId = :userId AND utl.status = 'COMPLETED' AND utl.userTaskId IN :taskIds " +
             "GROUP BY utl.userTaskId")
     List<Object[]> findLastCompletionDates(@Param("userId") UUID userId, @Param("taskIds") Collection<UUID> taskIds);
+
+    List<UserTaskLogEntity> findByUserId(UUID userId);
 }
