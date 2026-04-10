@@ -18,6 +18,22 @@ services:
       timeout: 5s
       retries: 5
 
+  backend:
+    build: .
+    container_name: spoony-backend
+    environment:
+      DATABASE_URL: jdbc:postgresql://db:5432/spoony_dev
+      DATABASE_USER: spoony
+      DATABASE_PASSWORD: spoony_dev_password
+      JWT_SECRET: dev-secret-key-change-this-in-production-minimum-256-bits-xxxxxxxxxxxxxxxxxxxx
+      JWT_EXPIRATION: 86400000
+      SPRING_PROFILES_ACTIVE: docker
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
   adminer:
     image: adminer:latest
     container_name: spoony-adminer
