@@ -1,10 +1,10 @@
 package com.spoony.backend.application.rest.tasklog;
 
 import com.spoony.backend.application.rest.common.JSendResponse;
+import com.spoony.backend.application.tasklog.TaskLogApplicationService;
 import com.spoony.backend.domain.tasklog.model.BulkPostponeResult;
 import com.spoony.backend.domain.tasklog.model.TaskLogStatus;
 import com.spoony.backend.domain.tasklog.model.UserTaskLog;
-import com.spoony.backend.domain.tasklog.port.in.TaskLogUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -31,10 +31,10 @@ import java.util.UUID;
 @Tag(name = "TaskLogs", description = "Gestion des logs de tâches quotidiens")
 public class TaskLogController {
 
-    private final TaskLogUseCase taskLogUseCase;
+    private final TaskLogApplicationService taskLogApplicationService;
 
-    public TaskLogController(TaskLogUseCase taskLogUseCase) {
-        this.taskLogUseCase = taskLogUseCase;
+    public TaskLogController(TaskLogApplicationService taskLogApplicationService) {
+        this.taskLogApplicationService = taskLogApplicationService;
     }
 
     @GetMapping
@@ -43,7 +43,7 @@ public class TaskLogController {
     public ResponseEntity<JSendResponse<List<TaskLogResponse>>> getTodayLogs(
             @RequestParam(name = "include_archived", defaultValue = "false") boolean includeArchived) {
         UUID userId = getCurrentUserId();
-        List<TaskLogResponse> logs = taskLogUseCase.getTodayLogs(userId, includeArchived).stream()
+        List<TaskLogResponse> logs = taskLogApplicationService.getTodayLogs(userId, includeArchived).stream()
                 .map(TaskLogResponse::fromDomain)
                 .toList();
         return ResponseEntity.ok(JSendResponse.success(logs));
@@ -56,7 +56,7 @@ public class TaskLogController {
     public ResponseEntity<JSendResponse<List<TaskLogResponse>>> createLogs(
             @Valid @RequestBody CreateTaskLogsRequest request) {
         UUID userId = getCurrentUserId();
-        List<TaskLogResponse> logs = taskLogUseCase.createLogs(request.getUserTaskIds(), userId).stream()
+        List<TaskLogResponse> logs = taskLogApplicationService.createLogs(request.getUserTaskIds(), userId).stream()
                 .map(TaskLogResponse::fromDomain)
                 .toList();
         return ResponseEntity.status(HttpStatus.CREATED).body(JSendResponse.success(logs));
@@ -69,7 +69,7 @@ public class TaskLogController {
     public ResponseEntity<JSendResponse<TaskLogResponse>> createManualLog(
             @Valid @RequestBody CreateManualTaskLogRequest request) {
         UUID userId = getCurrentUserId();
-        UserTaskLog log = taskLogUseCase.createManualLog(request.getUserTaskId(), userId);
+        UserTaskLog log = taskLogApplicationService.createManualLog(request.getUserTaskId(), userId);
         return ResponseEntity.status(HttpStatus.CREATED).body(JSendResponse.success(TaskLogResponse.fromDomain(log)));
     }
 
@@ -86,7 +86,7 @@ public class TaskLogController {
             @Valid @RequestBody UpdateTaskLogStatusRequest request) {
         UUID userId = getCurrentUserId();
         TaskLogStatus newStatus = TaskLogStatus.valueOf(request.getStatus());
-        UserTaskLog log = taskLogUseCase.updateStatus(id, newStatus, userId);
+        UserTaskLog log = taskLogApplicationService.updateStatus(id, newStatus, userId);
         return ResponseEntity.ok(JSendResponse.success(TaskLogResponse.fromDomain(log)));
     }
 
@@ -101,7 +101,7 @@ public class TaskLogController {
             @RequestBody(required = false) BulkPostponeRequest request) {
         UUID userId = getCurrentUserId();
         java.time.LocalDate targetDate = request != null ? request.getTargetDate() : null;
-        BulkPostponeResult result = taskLogUseCase.bulkPostpone(userId, targetDate);
+        BulkPostponeResult result = taskLogApplicationService.bulkPostpone(userId, targetDate);
         return ResponseEntity.ok(JSendResponse.success(BulkPostponeResponse.fromDomain(result)));
     }
 
