@@ -2,6 +2,7 @@ package com.spoony.backend.domain.tasklog.service;
 
 import com.spoony.backend.domain.energy.model.DailyEnergy;
 import com.spoony.backend.domain.energy.port.out.EnergyPort;
+import com.spoony.backend.domain.shared.port.out.TaskPostponePort;
 import com.spoony.backend.domain.tasklog.model.BulkPostponeResult;
 import com.spoony.backend.domain.tasklog.model.TaskLogStatus;
 import com.spoony.backend.domain.tasklog.model.UserTaskLog;
@@ -36,11 +37,14 @@ class TaskLogServiceTest {
     @Mock
     private EnergyPort energyPort;
 
+    @Mock
+    private TaskPostponePort taskPostponePort;
+
     private TaskLogService taskLogService;
 
     @BeforeEach
     void setUp() {
-        taskLogService = new TaskLogService(taskLogPort, energyPort);
+        taskLogService = new TaskLogService(taskLogPort, energyPort, taskPostponePort);
     }
 
     // --- getTodayLogs ---
@@ -348,36 +352,29 @@ class TaskLogServiceTest {
     // --- bulkPostpone ---
 
     @Test
-    void should_PostponeAllPlanned_When_TasksExist() {
+    void should_PostponeActiveTasks_When_TasksExist() {
         // Arrange
         UUID userId = UUID.randomUUID();
-        UserTaskLog log1 = createLog(userId);
-        log1.setDate(LocalDate.now());
-        log1.setStatus(TaskLogStatus.PLANNED);
-        UserTaskLog log2 = createLog(userId);
-        log2.setDate(LocalDate.now());
-        log2.setStatus(TaskLogStatus.PLANNED);
-
-        when(taskLogPort.findByUserIdAndDateAndStatus(userId, LocalDate.now(), TaskLogStatus.PLANNED))
-                .thenReturn(List.of(log1, log2));
-        when(taskLogPort.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        LocalDate today = LocalDate.now();
+        LocalDate tomorrow = today.plusDays(1);
+        when(taskPostponePort.postponeAllActiveTasks(userId, today, tomorrow)).thenReturn(2);
 
         // Act
         BulkPostponeResult result = taskLogService.bulkPostpone(userId, null);
 
         // Assert
         assertThat(result.getPostponedCount()).isEqualTo(2);
-        assertThat(result.getNewDate()).isEqualTo(LocalDate.now().plusDays(1));
-        assertThat(log1.getDate()).isEqualTo(LocalDate.now().plusDays(1));
-        assertThat(log2.getDate()).isEqualTo(LocalDate.now().plusDays(1));
+        assertThat(result.getNewDate()).isEqualTo(tomorrow);
+        verify(taskPostponePort).postponeAllActiveTasks(userId, today, tomorrow);
     }
 
     @Test
-    void should_ThrowNoActiveTasks_When_NoPlannedLogs() {
+    void should_ThrowNoActiveTasks_When_NoActiveTasks() {
         // Arrange
         UUID userId = UUID.randomUUID();
-        when(taskLogPort.findByUserIdAndDateAndStatus(userId, LocalDate.now(), TaskLogStatus.PLANNED))
-                .thenReturn(List.of());
+        LocalDate today = LocalDate.now();
+        LocalDate tomorrow = today.plusDays(1);
+        when(taskPostponePort.postponeAllActiveTasks(userId, today, tomorrow)).thenReturn(0);
 
         // Act & Assert
         assertThatThrownBy(() -> taskLogService.bulkPostpone(userId, null))
@@ -389,20 +386,32 @@ class TaskLogServiceTest {
         // Arrange
         UUID userId = UUID.randomUUID();
         LocalDate targetDate = LocalDate.of(2026, 3, 20);
-        UserTaskLog log = createLog(userId);
-        log.setDate(LocalDate.now());
-        log.setStatus(TaskLogStatus.PLANNED);
-
-        when(taskLogPort.findByUserIdAndDateAndStatus(userId, LocalDate.now(), TaskLogStatus.PLANNED))
-                .thenReturn(List.of(log));
-        when(taskLogPort.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(taskPostponePort.postponeAllActiveTasks(userId, LocalDate.now(), targetDate)).thenReturn(1);
 
         // Act
         BulkPostponeResult result = taskLogService.bulkPostpone(userId, targetDate);
 
         // Assert
+        assertThat(result.getPostponedCount()).isEqualTo(1);
         assertThat(result.getNewDate()).isEqualTo(targetDate);
-        assertThat(log.getDate()).isEqualTo(targetDate);
+        verify(taskPostponePort).postponeAllActiveTasks(userId, LocalDate.now(), targetDate);
+    }
+
+    @Test
+    void should_NotTouchTaskLogs_When_BulkPostpone() {
+        // Arrange — la sémantique du bulk postpone porte sur user_tasks, pas sur user_task_logs.
+        // Les logs PLANNED éventuels du jour ne sont PAS modifiés.
+        UUID userId = UUID.randomUUID();
+        LocalDate today = LocalDate.now();
+        LocalDate tomorrow = today.plusDays(1);
+        when(taskPostponePort.postponeAllActiveTasks(userId, today, tomorrow)).thenReturn(2);
+
+        // Act
+        taskLogService.bulkPostpone(userId, null);
+
+        // Assert
+        verify(taskLogPort, never()).findByUserIdAndDateAndStatus(any(), any(), any());
+        verify(taskLogPort, never()).saveAll(any());
     }
 
     // --- helpers ---

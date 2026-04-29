@@ -1,6 +1,6 @@
 package com.spoony.backend.infrastructure.persistence.adapter;
 
-import com.spoony.backend.domain.energy.port.out.BulkPostponePort;
+import com.spoony.backend.domain.shared.port.out.TaskPostponePort;
 import com.spoony.backend.domain.task.model.TaskStatus;
 import com.spoony.backend.infrastructure.persistence.entity.UserTaskEntity;
 import com.spoony.backend.infrastructure.persistence.repository.JpaUserTaskRepository;
@@ -11,11 +11,11 @@ import java.util.List;
 import java.util.UUID;
 
 @Component
-public class BulkPostponeAdapter implements BulkPostponePort {
+public class TaskPostponeAdapter implements TaskPostponePort {
 
     private final JpaUserTaskRepository userTaskRepository;
 
-    public BulkPostponeAdapter(JpaUserTaskRepository userTaskRepository) {
+    public TaskPostponeAdapter(JpaUserTaskRepository userTaskRepository) {
         this.userTaskRepository = userTaskRepository;
     }
 

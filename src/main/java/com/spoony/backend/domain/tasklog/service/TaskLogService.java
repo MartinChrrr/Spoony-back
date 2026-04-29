@@ -2,6 +2,7 @@ package com.spoony.backend.domain.tasklog.service;
 
 import com.spoony.backend.domain.energy.model.DailyEnergy;
 import com.spoony.backend.domain.energy.port.out.EnergyPort;
+import com.spoony.backend.domain.shared.port.out.TaskPostponePort;
 import com.spoony.backend.domain.tasklog.model.BulkPostponeResult;
 import com.spoony.backend.domain.tasklog.model.TaskLogStatus;
 import com.spoony.backend.domain.tasklog.model.UserTaskLog;
@@ -26,10 +27,12 @@ public class TaskLogService implements TaskLogUseCase {
 
     private final TaskLogPort taskLogPort;
     private final EnergyPort energyPort;
+    private final TaskPostponePort taskPostponePort;
 
-    public TaskLogService(TaskLogPort taskLogPort, EnergyPort energyPort) {
+    public TaskLogService(TaskLogPort taskLogPort, EnergyPort energyPort, TaskPostponePort taskPostponePort) {
         this.taskLogPort = taskLogPort;
         this.energyPort = energyPort;
+        this.taskPostponePort = taskPostponePort;
     }
 
     @Override
@@ -133,18 +136,13 @@ public class TaskLogService implements TaskLogUseCase {
         LocalDate today = LocalDate.now();
         LocalDate newDate = targetDate != null ? targetDate : today.plusDays(1);
 
-        List<UserTaskLog> plannedLogs = taskLogPort.findByUserIdAndDateAndStatus(userId, today, TaskLogStatus.PLANNED);
+        int count = taskPostponePort.postponeAllActiveTasks(userId, today, newDate);
 
-        if (plannedLogs.isEmpty()) {
+        if (count == 0) {
             throw new NoActiveTasksException();
         }
 
-        for (UserTaskLog taskLog : plannedLogs) {
-            taskLog.setDate(newDate);
-        }
-
-        taskLogPort.saveAll(plannedLogs);
-        log.info("Bulk postpone userId={} count={} newDate={}", userId, plannedLogs.size(), newDate);
-        return new BulkPostponeResult(plannedLogs.size(), newDate);
+        log.info("Bulk postpone userId={} count={} newDate={}", userId, count, newDate);
+        return new BulkPostponeResult(count, newDate);
     }
 }

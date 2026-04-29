@@ -1,7 +1,7 @@
 package com.spoony.backend.domain.energy.service;
 
 import com.spoony.backend.domain.energy.model.DailyEnergy;
-import com.spoony.backend.domain.energy.port.out.BulkPostponePort;
+import com.spoony.backend.domain.shared.port.out.TaskPostponePort;
 import com.spoony.backend.domain.energy.port.out.EnergyPort;
 import com.spoony.backend.domain.shared.exception.EnergyAlreadyDeclaredException;
 import com.spoony.backend.domain.shared.exception.EnergyNotDeclaredException;
@@ -32,13 +32,13 @@ class EnergyServiceTest {
     private EnergyPort energyPort;
 
     @Mock
-    private BulkPostponePort bulkPostponePort;
+    private TaskPostponePort taskPostponePort;
 
     private EnergyService energyService;
 
     @BeforeEach
     void setUp() {
-        energyService = new EnergyService(energyPort, bulkPostponePort);
+        energyService = new EnergyService(energyPort, taskPostponePort);
     }
 
     // --- getTodayEnergy ---
@@ -91,7 +91,7 @@ class EnergyServiceTest {
         assertThat(result.getDate()).isEqualTo(LocalDate.now());
         assertThat(result.getId()).isNotNull();
         verify(energyPort).save(any(DailyEnergy.class));
-        verify(bulkPostponePort, never()).postponeAllActiveTasks(any(), any(), any());
+        verify(taskPostponePort, never()).postponeAllActiveTasks(any(), any(), any());
     }
 
     @Test
@@ -116,7 +116,7 @@ class EnergyServiceTest {
                 .thenReturn(Optional.empty());
         when(energyPort.save(any(DailyEnergy.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        when(bulkPostponePort.postponeAllActiveTasks(
+        when(taskPostponePort.postponeAllActiveTasks(
                 eq(userId), eq(LocalDate.now()), eq(LocalDate.now().plusDays(1))))
                 .thenReturn(3);
 
@@ -125,7 +125,7 @@ class EnergyServiceTest {
 
         // Assert
         assertThat(result.getSpoons()).isEqualTo(0);
-        verify(bulkPostponePort).postponeAllActiveTasks(
+        verify(taskPostponePort).postponeAllActiveTasks(
                 userId, LocalDate.now(), LocalDate.now().plusDays(1));
     }
 
@@ -142,7 +142,7 @@ class EnergyServiceTest {
         energyService.declareEnergy(5, userId);
 
         // Assert
-        verify(bulkPostponePort, never()).postponeAllActiveTasks(any(), any(), any());
+        verify(taskPostponePort, never()).postponeAllActiveTasks(any(), any(), any());
     }
 
     @Test
@@ -153,16 +153,16 @@ class EnergyServiceTest {
                 .thenReturn(Optional.empty());
         when(energyPort.save(any(DailyEnergy.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
-        when(bulkPostponePort.postponeAllActiveTasks(any(), any(), any()))
+        when(taskPostponePort.postponeAllActiveTasks(any(), any(), any()))
                 .thenReturn(0);
 
         // Act
         energyService.declareEnergy(0, userId);
 
         // Assert
-        InOrder order = inOrder(energyPort, bulkPostponePort);
+        InOrder order = inOrder(energyPort, taskPostponePort);
         order.verify(energyPort).save(any(DailyEnergy.class));
-        order.verify(bulkPostponePort).postponeAllActiveTasks(any(), any(), any());
+        order.verify(taskPostponePort).postponeAllActiveTasks(any(), any(), any());
     }
 
     // --- updateSpoons ---

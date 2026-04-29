@@ -2,8 +2,8 @@ package com.spoony.backend.domain.energy.service;
 
 import com.spoony.backend.domain.energy.model.DailyEnergy;
 import com.spoony.backend.domain.energy.port.in.EnergyUseCase;
-import com.spoony.backend.domain.energy.port.out.BulkPostponePort;
 import com.spoony.backend.domain.energy.port.out.EnergyPort;
+import com.spoony.backend.domain.shared.port.out.TaskPostponePort;
 import com.spoony.backend.domain.shared.exception.EnergyAlreadyDeclaredException;
 import com.spoony.backend.domain.shared.exception.EnergyNotDeclaredException;
 import org.slf4j.Logger;
@@ -17,11 +17,11 @@ public class EnergyService implements EnergyUseCase {
     private static final Logger log = LoggerFactory.getLogger(EnergyService.class);
 
     private final EnergyPort energyPort;
-    private final BulkPostponePort bulkPostponePort;
+    private final TaskPostponePort taskPostponePort;
 
-    public EnergyService(EnergyPort energyPort, BulkPostponePort bulkPostponePort) {
+    public EnergyService(EnergyPort energyPort, TaskPostponePort taskPostponePort) {
         this.energyPort = energyPort;
-        this.bulkPostponePort = bulkPostponePort;
+        this.taskPostponePort = taskPostponePort;
     }
 
     @Override
@@ -46,7 +46,7 @@ public class EnergyService implements EnergyUseCase {
 
         if (spoons == 0) {
             LocalDate tomorrow = today.plusDays(1);
-            int count = bulkPostponePort.postponeAllActiveTasks(userId, today, tomorrow);
+            int count = taskPostponePort.postponeAllActiveTasks(userId, today, tomorrow);
             log.info("Zero spoons: bulk postponed {} tasks userId={} to={}", count, userId, tomorrow);
         }
 
