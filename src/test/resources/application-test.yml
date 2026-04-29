@@ -16,7 +16,7 @@ spring:
 
 jwt:
   secret: test-secret-key-for-jwt-tokens-in-tests-minimum-256-bits-xxxxxxxxx
-  expiration: 900000
+  access-expiration: 900000
   refresh-expiration: 604800000
 
 logging:

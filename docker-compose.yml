@@ -26,7 +26,7 @@ services:
       DATABASE_USER: spoony
       DATABASE_PASSWORD: spoony_dev_password
       JWT_SECRET: dev-secret-key-change-this-in-production-minimum-256-bits-xxxxxxxxxxxxxxxxxxxx
-      JWT_EXPIRATION: 86400000
+      JWT_ACCESS_EXPIRATION: 900000
       SPRING_PROFILES_ACTIVE: docker
     ports:
       - "8080:8080"

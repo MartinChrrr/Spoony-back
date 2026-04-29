@@ -53,7 +53,8 @@ Variables d'environnement (fichier `.env`) :
 | `DATABASE_USER` | Utilisateur BDD | `spoony` |
 | `DATABASE_PASSWORD` | Mot de passe BDD | `spoony_dev_password` |
 | `JWT_SECRET` | Cle secrete pour signer les tokens JWT | cle de dev (a changer en prod) |
-| `JWT_EXPIRATION` | Duree de vie du token d'acces (ms) | `86400000` (24h) |
+| `JWT_ACCESS_EXPIRATION` | Duree de vie du token d'acces (ms) | `900000` (15 min) |
+| `JWT_REFRESH_EXPIRATION` | Duree de vie du refresh token (ms) | `604800000` (7 jours) |
 | `SPRING_PROFILES_ACTIVE` | Profil Spring actif | `dev` |
 
 ## Architecture
