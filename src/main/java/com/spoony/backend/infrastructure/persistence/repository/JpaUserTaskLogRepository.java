@@ -16,6 +16,8 @@ public interface JpaUserTaskLogRepository extends JpaRepository<UserTaskLogEntit
 
     List<UserTaskLogEntity> findByUserIdAndDate(UUID userId, LocalDate date);
 
+    List<UserTaskLogEntity> findByUserIdAndDateBetween(UUID userId, LocalDate from, LocalDate to);
+
     List<UserTaskLogEntity> findByUserIdAndDateAndStatus(UUID userId, LocalDate date, TaskLogStatus status);
 
     List<UserTaskLogEntity> findByUserIdAndStatusAndCompletedAtBefore(UUID userId, TaskLogStatus status, LocalDateTime cutoff);

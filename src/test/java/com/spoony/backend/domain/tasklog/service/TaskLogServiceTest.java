@@ -81,6 +81,40 @@ class TaskLogServiceTest {
         verify(taskLogPort, never()).findByUserIdAndDate(any(), any());
     }
 
+    // --- getLogsInRange ---
+
+    @Test
+    void should_ReturnLogsInRange_When_RangeValid() {
+        // Arrange
+        UUID userId = UUID.randomUUID();
+        LocalDate from = LocalDate.of(2026, 4, 1);
+        LocalDate to = LocalDate.of(2026, 4, 30);
+        List<UserTaskLog> rangeLogs = List.of(createLog(userId), createLog(userId), createLog(userId));
+        when(taskLogPort.findByUserIdAndDateBetween(userId, from, to)).thenReturn(rangeLogs);
+
+        // Act
+        List<UserTaskLog> result = taskLogService.getLogsInRange(userId, from, to);
+
+        // Assert
+        assertThat(result).hasSize(3);
+        verify(taskLogPort).findByUserIdAndDateBetween(userId, from, to);
+    }
+
+    @Test
+    void should_ReturnEmpty_When_FromAfterTo() {
+        // Arrange
+        UUID userId = UUID.randomUUID();
+        LocalDate from = LocalDate.of(2026, 4, 30);
+        LocalDate to = LocalDate.of(2026, 4, 1);
+
+        // Act
+        List<UserTaskLog> result = taskLogService.getLogsInRange(userId, from, to);
+
+        // Assert
+        assertThat(result).isEmpty();
+        verify(taskLogPort, never()).findByUserIdAndDateBetween(any(), any(), any());
+    }
+
     // --- createLogs ---
 
     @Test

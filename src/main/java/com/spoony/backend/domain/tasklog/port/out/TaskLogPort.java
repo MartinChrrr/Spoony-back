@@ -12,6 +12,8 @@ public interface TaskLogPort {
 
     List<UserTaskLog> findByUserIdAndDate(UUID userId, LocalDate date);
 
+    List<UserTaskLog> findByUserIdAndDateBetween(UUID userId, LocalDate from, LocalDate to);
+
     List<UserTaskLog> findByUserIdAndDateExcludeArchived(UUID userId, LocalDate date);
 
     List<UserTaskLog> findByUserIdAndDateAndStatus(UUID userId, LocalDate date, TaskLogStatus status);

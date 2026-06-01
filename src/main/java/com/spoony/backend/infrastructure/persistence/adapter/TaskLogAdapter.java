@@ -34,6 +34,13 @@ public class TaskLogAdapter implements TaskLogPort {
     }
 
     @Override
+    public List<UserTaskLog> findByUserIdAndDateBetween(UUID userId, LocalDate from, LocalDate to) {
+        return taskLogRepository.findByUserIdAndDateBetween(userId, from, to).stream()
+                .map(TaskLogMapper::toDomain)
+                .toList();
+    }
+
+    @Override
     public List<UserTaskLog> findByUserIdAndDateExcludeArchived(UUID userId, LocalDate date) {
         LocalDateTime cutoff = LocalDateTime.now().minusHours(24);
         return taskLogRepository.findByUserIdAndDate(userId, date).stream()

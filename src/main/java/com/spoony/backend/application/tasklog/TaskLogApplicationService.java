@@ -24,6 +24,10 @@ public class TaskLogApplicationService {
         return taskLogUseCase.getTodayLogs(userId, includeArchived);
     }
 
+    public List<UserTaskLog> getLogsInRange(UUID userId, LocalDate from, LocalDate to) {
+        return taskLogUseCase.getLogsInRange(userId, from, to);
+    }
+
     @Transactional
     public List<UserTaskLog> createLogs(List<UUID> userTaskIds, UUID userId) {
         return taskLogUseCase.createLogs(userTaskIds, userId);

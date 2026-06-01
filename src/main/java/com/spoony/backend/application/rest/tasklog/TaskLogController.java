@@ -12,6 +12,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.security.core.context.SecurityContextHolder;
 
 import org.springframework.web.bind.annotation.GetMapping;
@@ -23,6 +24,7 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -38,12 +40,21 @@ public class TaskLogController {
     }
 
     @GetMapping
-    @Operation(summary = "Logs du jour", description = "Retourne les logs de tâches du jour. Par défaut exclut les complétés >24h.")
+    @Operation(
+            summary = "Logs (jour ou plage)",
+            description = "Sans from/to : logs du jour (exclut les complétés >24h par défaut). "
+                    + "Avec from ET to (YYYY-MM-DD) : tous les logs de la plage, pour le calendrier."
+    )
     @ApiResponse(responseCode = "200", description = "Logs retournés")
-    public ResponseEntity<JSendResponse<List<TaskLogResponse>>> getTodayLogs(
-            @RequestParam(name = "include_archived", defaultValue = "false") boolean includeArchived) {
+    public ResponseEntity<JSendResponse<List<TaskLogResponse>>> getLogs(
+            @RequestParam(name = "include_archived", defaultValue = "false") boolean includeArchived,
+            @RequestParam(name = "from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(name = "to", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         UUID userId = getCurrentUserId();
-        List<TaskLogResponse> logs = taskLogApplicationService.getTodayLogs(userId, includeArchived).stream()
+        List<UserTaskLog> domainLogs = (from != null && to != null)
+                ? taskLogApplicationService.getLogsInRange(userId, from, to)
+                : taskLogApplicationService.getTodayLogs(userId, includeArchived);
+        List<TaskLogResponse> logs = domainLogs.stream()
                 .map(TaskLogResponse::fromDomain)
                 .toList();
         return ResponseEntity.ok(JSendResponse.success(logs));

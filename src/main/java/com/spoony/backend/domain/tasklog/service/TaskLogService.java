@@ -45,6 +45,16 @@ public class TaskLogService implements TaskLogUseCase {
     }
 
     @Override
+    public List<UserTaskLog> getLogsInRange(UUID userId, LocalDate from, LocalDate to) {
+        // Calendar history: return every log in the visible range (no 24h-archive
+        // filtering — past completed tasks must remain visible).
+        if (from.isAfter(to)) {
+            return List.of();
+        }
+        return taskLogPort.findByUserIdAndDateBetween(userId, from, to);
+    }
+
+    @Override
     public List<UserTaskLog> createLogs(List<UUID> userTaskIds, UUID userId) {
         LocalDate today = LocalDate.now();
         List<UserTaskLog> logs = new ArrayList<>();

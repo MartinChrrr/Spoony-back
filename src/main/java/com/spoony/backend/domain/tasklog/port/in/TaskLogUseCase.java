@@ -12,6 +12,8 @@ public interface TaskLogUseCase {
 
     List<UserTaskLog> getTodayLogs(UUID userId, boolean includeArchived);
 
+    List<UserTaskLog> getLogsInRange(UUID userId, LocalDate from, LocalDate to);
+
     List<UserTaskLog> createLogs(List<UUID> userTaskIds, UUID userId);
 
     UserTaskLog createManualLog(UUID userTaskId, UUID userId);
