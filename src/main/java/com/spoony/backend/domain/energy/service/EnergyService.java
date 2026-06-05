@@ -62,6 +62,13 @@ public class EnergyService implements EnergyUseCase {
         existing.setSpoons(spoons);
         DailyEnergy saved = energyPort.save(existing);
         log.info("Spoons updated userId={} newSpoons={}", userId, spoons);
+
+        if (spoons == 0) {
+            LocalDate tomorrow = today.plusDays(1);
+            int count = taskPostponePort.postponeAllActiveTasks(userId, today, tomorrow);
+            log.info("Zero spoons revision: bulk postponed {} planned logs userId={} to={}", count, userId, tomorrow);
+        }
+
         return saved;
     }
 

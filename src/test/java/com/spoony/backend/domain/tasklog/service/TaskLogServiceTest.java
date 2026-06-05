@@ -432,20 +432,20 @@ class TaskLogServiceTest {
     }
 
     @Test
-    void should_NotTouchTaskLogs_When_BulkPostpone() {
-        // Arrange — la sémantique du bulk postpone porte sur user_tasks, pas sur user_task_logs.
-        // Les logs PLANNED éventuels du jour ne sont PAS modifiés.
+    void should_DelegateToPostponePort_When_BulkPostpone() {
+        // Arrange — la suppression des logs PLANNED est faite dans TaskPostponeAdapter (infra),
+        // pas dans le service domaine. Le service délègue simplement au port.
         UUID userId = UUID.randomUUID();
         LocalDate today = LocalDate.now();
         LocalDate tomorrow = today.plusDays(1);
         when(taskPostponePort.postponeAllActiveTasks(userId, today, tomorrow)).thenReturn(2);
 
         // Act
-        taskLogService.bulkPostpone(userId, null);
+        BulkPostponeResult result = taskLogService.bulkPostpone(userId, null);
 
         // Assert
-        verify(taskLogPort, never()).findByUserIdAndDateAndStatus(any(), any(), any());
-        verify(taskLogPort, never()).saveAll(any());
+        assertThat(result.getPostponedCount()).isEqualTo(2);
+        verify(taskPostponePort).postponeAllActiveTasks(userId, today, tomorrow);
     }
 
     // --- helpers ---

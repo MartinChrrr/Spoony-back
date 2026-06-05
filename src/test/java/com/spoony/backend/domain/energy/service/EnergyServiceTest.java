@@ -183,6 +183,7 @@ class EnergyServiceTest {
         // Assert
         assertThat(result.getSpoons()).isEqualTo(5);
         verify(energyPort).save(any(DailyEnergy.class));
+        verify(taskPostponePort, never()).postponeAllActiveTasks(any(), any(), any());
     }
 
     @Test
@@ -195,6 +196,66 @@ class EnergyServiceTest {
         // Act & Assert
         assertThatThrownBy(() -> energyService.updateSpoons(5, userId))
                 .isInstanceOf(EnergyNotDeclaredException.class);
+    }
+
+    @Test
+    void should_PostponePlannedLogs_When_UpdateSpoonsToZero() {
+        // Arrange
+        UUID userId = UUID.randomUUID();
+        DailyEnergy existing = createEnergy(userId, 5);
+        when(energyPort.findByUserIdAndDate(userId, LocalDate.now()))
+                .thenReturn(Optional.of(existing));
+        when(energyPort.save(any(DailyEnergy.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(taskPostponePort.postponeAllActiveTasks(
+                eq(userId), eq(LocalDate.now()), eq(LocalDate.now().plusDays(1))))
+                .thenReturn(2);
+
+        // Act
+        DailyEnergy result = energyService.updateSpoons(0, userId);
+
+        // Assert
+        assertThat(result.getSpoons()).isEqualTo(0);
+        verify(taskPostponePort).postponeAllActiveTasks(
+                userId, LocalDate.now(), LocalDate.now().plusDays(1));
+    }
+
+    @Test
+    void should_NotPostpone_When_UpdateSpoonsNonZero() {
+        // Arrange
+        UUID userId = UUID.randomUUID();
+        DailyEnergy existing = createEnergy(userId, 8);
+        when(energyPort.findByUserIdAndDate(userId, LocalDate.now()))
+                .thenReturn(Optional.of(existing));
+        when(energyPort.save(any(DailyEnergy.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+
+        // Act
+        energyService.updateSpoons(3, userId);
+
+        // Assert
+        verify(taskPostponePort, never()).postponeAllActiveTasks(any(), any(), any());
+    }
+
+    @Test
+    void should_SaveBeforePostpone_When_UpdateSpoonsToZero() {
+        // Arrange
+        UUID userId = UUID.randomUUID();
+        DailyEnergy existing = createEnergy(userId, 5);
+        when(energyPort.findByUserIdAndDate(userId, LocalDate.now()))
+                .thenReturn(Optional.of(existing));
+        when(energyPort.save(any(DailyEnergy.class)))
+                .thenAnswer(invocation -> invocation.getArgument(0));
+        when(taskPostponePort.postponeAllActiveTasks(any(), any(), any()))
+                .thenReturn(0);
+
+        // Act
+        energyService.updateSpoons(0, userId);
+
+        // Assert
+        InOrder order = inOrder(energyPort, taskPostponePort);
+        order.verify(energyPort).save(any(DailyEnergy.class));
+        order.verify(taskPostponePort).postponeAllActiveTasks(any(), any(), any());
     }
 
     // --- updateMood ---

@@ -1,8 +1,8 @@
 package com.spoony.backend.application.rest.energy;
 
+import com.spoony.backend.application.energy.EnergyApplicationService;
 import com.spoony.backend.application.rest.common.JSendResponse;
 import com.spoony.backend.domain.energy.model.DailyEnergy;
-import com.spoony.backend.domain.energy.port.in.EnergyUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -26,10 +26,10 @@ import java.util.UUID;
 @Tag(name = "Energy", description = "Gestion de l'énergie quotidienne (cuillères)")
 public class EnergyController {
 
-    private final EnergyUseCase energyUseCase;
+    private final EnergyApplicationService energyApplicationService;
 
-    public EnergyController(EnergyUseCase energyUseCase) {
-        this.energyUseCase = energyUseCase;
+    public EnergyController(EnergyApplicationService energyApplicationService) {
+        this.energyApplicationService = energyApplicationService;
     }
 
     @GetMapping("/today")
@@ -38,7 +38,7 @@ public class EnergyController {
     @ApiResponse(responseCode = "404", description = "Énergie non déclarée")
     public ResponseEntity<JSendResponse<EnergyResponse>> getToday() {
         UUID userId = getCurrentUserId();
-        DailyEnergy energy = energyUseCase.getTodayEnergy(userId);
+        DailyEnergy energy = energyApplicationService.getTodayEnergy(userId);
         return ResponseEntity.ok(JSendResponse.success(EnergyResponse.fromDomain(energy)));
     }
 
@@ -53,7 +53,7 @@ public class EnergyController {
     public ResponseEntity<JSendResponse<EnergyResponse>> declare(
             @Valid @RequestBody DeclareEnergyRequest request) {
         UUID userId = getCurrentUserId();
-        DailyEnergy energy = energyUseCase.declareEnergy(request.getSpoons(), userId);
+        DailyEnergy energy = energyApplicationService.declareEnergy(request.getSpoons(), userId);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(JSendResponse.success(EnergyResponse.fromDomain(energy)));
     }
@@ -69,7 +69,7 @@ public class EnergyController {
     public ResponseEntity<JSendResponse<EnergyResponse>> updateSpoons(
             @Valid @RequestBody UpdateSpoonsRequest request) {
         UUID userId = getCurrentUserId();
-        DailyEnergy energy = energyUseCase.updateSpoons(request.getSpoons(), userId);
+        DailyEnergy energy = energyApplicationService.updateSpoons(request.getSpoons(), userId);
         return ResponseEntity.ok(JSendResponse.success(EnergyResponse.fromDomain(energy)));
     }
 
@@ -84,7 +84,7 @@ public class EnergyController {
     public ResponseEntity<JSendResponse<EnergyResponse>> updateMood(
             @Valid @RequestBody UpdateMoodRequest request) {
         UUID userId = getCurrentUserId();
-        DailyEnergy energy = energyUseCase.updateMood(request.getMoodEnd(), userId);
+        DailyEnergy energy = energyApplicationService.updateMood(request.getMoodEnd(), userId);
         return ResponseEntity.ok(JSendResponse.success(EnergyResponse.fromDomain(energy)));
     }
 
