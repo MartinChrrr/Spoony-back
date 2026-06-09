@@ -38,6 +38,26 @@ class BulkPostponeIntegrationTest extends IntegrationTestSupport {
     }
 
     @Test
+    void should_PostponeOverdueAndTodayTasks_When_DueDateLessThanOrEqualToday() throws Exception {
+        // ADR-008 : « Tout reporter » couvre les tâches en retard (due_date < today) ET du jour.
+        UserEntity user = createUser();
+        UserTaskEntity overdue = createTask(user.getId(), "Overdue", 2,
+                LocalDate.now().minusDays(3), com.spoony.backend.domain.task.model.TaskStatus.ACTIVE);
+        UserTaskEntity dueToday = createTask(user.getId(), "Today", 1);
+
+        mockMvc.perform(post("/api/task-logs/bulk-postpone")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(user.getId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.postponedCount").value(2));
+
+        LocalDate tomorrow = LocalDate.now().plusDays(1);
+        assertThat(userTaskRepository.findById(overdue.getId()).orElseThrow().getDueDate()).isEqualTo(tomorrow);
+        assertThat(userTaskRepository.findById(dueToday.getId()).orElseThrow().getDueDate()).isEqualTo(tomorrow);
+    }
+
+    @Test
     void should_Return404_When_NoActiveTasks() throws Exception {
         UserEntity user = createUser();
 

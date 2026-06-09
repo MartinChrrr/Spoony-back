@@ -46,7 +46,7 @@ class TaskPostponeAdapterTest {
 
         UserTaskEntity task1 = createTaskEntity(userId, today);
         UserTaskEntity task2 = createTaskEntity(userId, today);
-        when(userTaskRepository.findByUserIdAndStatusAndDueDate(userId, TaskStatus.ACTIVE, today))
+        when(userTaskRepository.findByUserIdAndStatusAndDueDateLessThanEqual(userId, TaskStatus.ACTIVE, today))
                 .thenReturn(List.of(task1, task2));
         when(userTaskLogRepository.findByUserIdAndDateAndStatus(userId, today, TaskLogStatus.PLANNED))
                 .thenReturn(List.of());
@@ -62,13 +62,37 @@ class TaskPostponeAdapterTest {
     }
 
     @Test
+    void should_PostponeOverdueTasks_When_TasksDueBeforeFromDate() {
+        // ADR-008 : « Tout reporter » cible due_date <= today (en retard + du jour).
+        UUID userId = UUID.randomUUID();
+        LocalDate today = LocalDate.now();
+        LocalDate yesterday = today.minusDays(1);
+        LocalDate tomorrow = today.plusDays(1);
+
+        UserTaskEntity overdue = createTaskEntity(userId, yesterday);
+        UserTaskEntity dueToday = createTaskEntity(userId, today);
+        // Le repository (filtre SQL <=) renvoie les deux ; l'adapter les décale tels quels.
+        when(userTaskRepository.findByUserIdAndStatusAndDueDateLessThanEqual(userId, TaskStatus.ACTIVE, today))
+                .thenReturn(List.of(overdue, dueToday));
+        when(userTaskLogRepository.findByUserIdAndDateAndStatus(userId, today, TaskLogStatus.PLANNED))
+                .thenReturn(List.of());
+
+        int count = adapter.postponeAllActiveTasks(userId, today, tomorrow);
+
+        assertThat(count).isEqualTo(2);
+        assertThat(overdue.getDueDate()).isEqualTo(tomorrow);
+        assertThat(dueToday.getDueDate()).isEqualTo(tomorrow);
+        verify(userTaskRepository).saveAll(List.of(overdue, dueToday));
+    }
+
+    @Test
     void should_DeletePlannedLogs_When_PlannedLogsExistOnFromDate() {
         // Arrange
         UUID userId = UUID.randomUUID();
         LocalDate today = LocalDate.now();
         LocalDate tomorrow = today.plusDays(1);
 
-        when(userTaskRepository.findByUserIdAndStatusAndDueDate(userId, TaskStatus.ACTIVE, today))
+        when(userTaskRepository.findByUserIdAndStatusAndDueDateLessThanEqual(userId, TaskStatus.ACTIVE, today))
                 .thenReturn(List.of());
 
         UserTaskLogEntity plannedLog1 = createLogEntity(userId, today, TaskLogStatus.PLANNED);
@@ -90,7 +114,7 @@ class TaskPostponeAdapterTest {
         LocalDate today = LocalDate.now();
         LocalDate tomorrow = today.plusDays(1);
 
-        when(userTaskRepository.findByUserIdAndStatusAndDueDate(userId, TaskStatus.ACTIVE, today))
+        when(userTaskRepository.findByUserIdAndStatusAndDueDateLessThanEqual(userId, TaskStatus.ACTIVE, today))
                 .thenReturn(List.of());
         // Le repository ne retourne que des PLANNED (filtre SQL) — donc seuls ceux-là sont supprimés.
         when(userTaskLogRepository.findByUserIdAndDateAndStatus(userId, today, TaskLogStatus.PLANNED))
@@ -113,7 +137,7 @@ class TaskPostponeAdapterTest {
         LocalDate today = LocalDate.now();
         LocalDate tomorrow = today.plusDays(1);
 
-        when(userTaskRepository.findByUserIdAndStatusAndDueDate(userId, TaskStatus.ACTIVE, today))
+        when(userTaskRepository.findByUserIdAndStatusAndDueDateLessThanEqual(userId, TaskStatus.ACTIVE, today))
                 .thenReturn(List.of());
         when(userTaskLogRepository.findByUserIdAndDateAndStatus(userId, today, TaskLogStatus.PLANNED))
                 .thenReturn(List.of());
@@ -133,7 +157,7 @@ class TaskPostponeAdapterTest {
         LocalDate tomorrow = today.plusDays(1);
 
         UserTaskEntity task = createTaskEntity(userId, today);
-        when(userTaskRepository.findByUserIdAndStatusAndDueDate(userId, TaskStatus.ACTIVE, today))
+        when(userTaskRepository.findByUserIdAndStatusAndDueDateLessThanEqual(userId, TaskStatus.ACTIVE, today))
                 .thenReturn(List.of(task));
 
         UserTaskLogEntity log = createLogEntity(userId, today, TaskLogStatus.PLANNED);
