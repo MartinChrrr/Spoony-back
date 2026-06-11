@@ -1,0 +1,2 @@
+- [N5 report auto vs resurfacing](N5_auto-postpone-vs-resurfacing.md) — N5 clos comme couvert, pas de job end-of-day, resurfacing au check-in suffit
+- [Bienveillance vs automatisme](spoony_bienveillance-vs-automatisme.md) — préférer une décision consciente à un geste plutôt qu'un automatisme silencieux

@@ -39,7 +39,7 @@ public class BeanConfig {
     }
 
     @Bean
-    public SuggestionUseCase suggestionUseCase(TaskPort taskPort, EnergyPort energyPort, SuggestionPort suggestionPort) {
-        return new SuggestionService(taskPort, energyPort, suggestionPort, new DefaultSuggestionStrategy());
+    public SuggestionUseCase suggestionUseCase(TaskPort taskPort, EnergyPort energyPort, SuggestionPort suggestionPort, TaskLogPort taskLogPort) {
+        return new SuggestionService(taskPort, energyPort, suggestionPort, taskLogPort, new DefaultSuggestionStrategy());
     }
 }

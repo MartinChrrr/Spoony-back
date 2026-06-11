@@ -9,10 +9,13 @@ import com.spoony.backend.domain.task.model.Importance;
 import com.spoony.backend.domain.task.model.TaskStatus;
 import com.spoony.backend.domain.task.model.UserTask;
 import com.spoony.backend.domain.task.port.out.TaskPort;
+import com.spoony.backend.domain.tasklog.model.UserTaskLog;
+import com.spoony.backend.domain.tasklog.port.out.TaskLogPort;
 import com.spoony.backend.domain.shared.exception.EnergyNotDeclaredException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
@@ -45,13 +48,16 @@ class SuggestionServiceTest {
     private SuggestionPort suggestionPort;
 
     @Mock
+    private TaskLogPort taskLogPort;
+
+    @Mock
     private SuggestionStrategy strategy;
 
     private SuggestionService suggestionService;
 
     @BeforeEach
     void setUp() {
-        suggestionService = new SuggestionService(taskPort, energyPort, suggestionPort, strategy);
+        suggestionService = new SuggestionService(taskPort, energyPort, suggestionPort, taskLogPort, strategy);
     }
 
     @Test
@@ -158,7 +164,52 @@ class SuggestionServiceTest {
         assertThat(result.get(1).isExceedsBudget()).isTrue();
     }
 
+    @Test
+    void should_ExcludeTask_When_AlreadyLoggedToday() {
+        UUID userId = UUID.randomUUID();
+        DailyEnergy energy = createEnergy(8, 0);
+        UserTask logged = createTask(userId);
+        UserTask notLogged = createTask(userId);
+
+        when(energyPort.findByUserIdAndDate(userId, LocalDate.now())).thenReturn(Optional.of(energy));
+        when(taskPort.findByUserIdAndStatus(userId, TaskStatus.ACTIVE)).thenReturn(List.of(logged, notLogged));
+        when(taskLogPort.findByUserIdAndDate(userId, LocalDate.now()))
+                .thenReturn(List.of(createLog(userId, logged.getId())));
+        when(suggestionPort.findLastCompletionDates(eq(userId), any())).thenReturn(Map.of());
+
+        ArgumentCaptor<List<UserTask>> captor = ArgumentCaptor.forClass(List.class);
+        when(strategy.suggest(captor.capture(), anyInt(), anyMap())).thenReturn(List.of());
+
+        suggestionService.getSuggestions(userId);
+
+        assertThat(captor.getValue())
+                .extracting(UserTask::getId)
+                .containsExactly(notLogged.getId());
+    }
+
+    @Test
+    void should_ReturnEmpty_When_AllActiveTasksLoggedToday() {
+        UUID userId = UUID.randomUUID();
+        DailyEnergy energy = createEnergy(8, 0);
+        UserTask task = createTask(userId);
+
+        when(energyPort.findByUserIdAndDate(userId, LocalDate.now())).thenReturn(Optional.of(energy));
+        when(taskPort.findByUserIdAndStatus(userId, TaskStatus.ACTIVE)).thenReturn(List.of(task));
+        when(taskLogPort.findByUserIdAndDate(userId, LocalDate.now()))
+                .thenReturn(List.of(createLog(userId, task.getId())));
+
+        List<Suggestion> result = suggestionService.getSuggestions(userId);
+
+        assertThat(result).isEmpty();
+        verify(strategy, never()).suggest(any(), anyInt(), any());
+        verify(suggestionPort, never()).findLastCompletionDates(any(), any());
+    }
+
     // --- helpers ---
+
+    private UserTaskLog createLog(UUID userId, UUID userTaskId) {
+        return new UserTaskLog(UUID.randomUUID(), userId, userTaskId, LocalDate.now());
+    }
 
     private DailyEnergy createEnergy(int spoons, int spoonsUsed) {
         DailyEnergy energy = new DailyEnergy();

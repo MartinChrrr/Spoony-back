@@ -10,6 +10,7 @@ import com.spoony.backend.domain.shared.exception.TaskLogNotFoundException;
 import com.spoony.backend.domain.shared.exception.TaskNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -133,6 +134,48 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode().value()).isEqualTo(415);
         assertThat(response.getBody().getStatus()).isEqualTo("fail");
         assertThat(response.getBody().getData().get("code")).isEqualTo("UNSUPPORTED_MEDIA_TYPE");
+    }
+
+    @Test
+    void should_Return409_When_DuplicateTaskLog() {
+        DataIntegrityViolationException ex = new DataIntegrityViolationException(
+                "could not execute statement",
+                new RuntimeException("duplicate key value violates unique constraint "
+                        + "\"user_task_logs_user_task_id_date_key\""));
+
+        ResponseEntity<JSendResponse<Map<String, String>>> response =
+                handler.handleDataIntegrityViolation(ex);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(409);
+        assertThat(response.getBody().getStatus()).isEqualTo("fail");
+        assertThat(response.getBody().getData().get("code")).isEqualTo("TASK_LOG_ALREADY_EXISTS");
+    }
+
+    @Test
+    void should_Return409_When_DuplicateEnergy() {
+        DataIntegrityViolationException ex = new DataIntegrityViolationException(
+                "could not execute statement",
+                new RuntimeException("duplicate key value violates unique constraint "
+                        + "\"daily_energy_user_id_date_key\""));
+
+        ResponseEntity<JSendResponse<Map<String, String>>> response =
+                handler.handleDataIntegrityViolation(ex);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(409);
+        assertThat(response.getBody().getData().get("code")).isEqualTo("ENERGY_ALREADY_DECLARED");
+    }
+
+    @Test
+    void should_Return409Generic_When_UnknownConstraint() {
+        DataIntegrityViolationException ex = new DataIntegrityViolationException(
+                "could not execute statement",
+                new RuntimeException("violates unique constraint \"some_other_key\""));
+
+        ResponseEntity<JSendResponse<Map<String, String>>> response =
+                handler.handleDataIntegrityViolation(ex);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(409);
+        assertThat(response.getBody().getData().get("code")).isEqualTo("DUPLICATE_RESOURCE");
     }
 
     @Test

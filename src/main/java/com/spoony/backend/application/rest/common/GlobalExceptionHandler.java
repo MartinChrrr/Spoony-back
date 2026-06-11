@@ -3,6 +3,7 @@ package com.spoony.backend.application.rest.common;
 import com.spoony.backend.domain.shared.exception.BusinessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -84,6 +85,36 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
                 .body(JSendResponse.fail("UNSUPPORTED_MEDIA_TYPE",
                         "Content-Type non supporté. Utilisez application/json"));
+    }
+
+    /**
+     * Maps a DB unique-constraint violation to a clean 409 instead of letting it
+     * fall through to the generic 500. Covers the two UNIQUE(..., date)
+     * constraints: user_task_logs(user_task_id, date) — a duplicate day log — and
+     * daily_energy(user_id, date) — energy already declared. Constraint names are
+     * Postgres defaults; we also match on the column pair as a fallback.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<JSendResponse<Map<String, String>>> handleDataIntegrityViolation(
+            DataIntegrityViolationException ex) {
+        String cause = ex.getMostSpecificCause().getMessage();
+        String hint = cause == null ? "" : cause.toLowerCase();
+
+        String code = "DUPLICATE_RESOURCE";
+        String message = "Cette ressource existe déjà.";
+        if (hint.contains("user_task_logs_user_task_id_date_key")
+                || (hint.contains("user_task_id") && hint.contains("date"))) {
+            code = "TASK_LOG_ALREADY_EXISTS";
+            message = "Cette tâche a déjà un suivi pour cette date.";
+        } else if (hint.contains("daily_energy_user_id_date_key")
+                || (hint.contains("user_id") && hint.contains("date"))) {
+            code = "ENERGY_ALREADY_DECLARED";
+            message = "L'énergie a déjà été déclarée pour cette date.";
+        }
+
+        log.warn("Data integrity violation: code={} cause={}", code, cause);
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(JSendResponse.fail(code, message));
     }
 
     @ExceptionHandler(Exception.class)
