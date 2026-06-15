@@ -46,6 +46,10 @@ public class AuthService {
                 passwordEncoder.encode(request.getPassword()),
                 request.getFirstName()
         );
+        // P0/RGPD Art. 9: explicit consent timestamp for health-data processing,
+        // captured at account creation. @AssertTrue on the request already guarantees
+        // consentGiven == true reached this point.
+        user.setConsentGivenAt(LocalDateTime.now());
 
         userRepository.save(user);
         log.info("User registered userId={}", user.getId());
@@ -93,6 +97,11 @@ public class AuthService {
         if (storedHash == null || !storedHash.equals(incomingHash)) {
             throw new InvalidCredentialsException();
         }
+
+        // P0/ADR-015: a token refresh is real activity. Without this, a user who stays
+        // logged in (only ever refreshing, never re-logging in) keeps a stale lastLoginAt
+        // and gets purged as "inactive" by the retention scheduler despite daily use.
+        user.setLastLoginAt(LocalDateTime.now());
 
         log.info("Token refreshed userId={}", userId);
 

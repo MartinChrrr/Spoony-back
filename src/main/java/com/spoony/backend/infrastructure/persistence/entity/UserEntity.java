@@ -25,6 +25,9 @@ public class UserEntity extends BaseEntity {
     @Column(name = "last_login_at")
     private LocalDateTime lastLoginAt;
 
+    @Column(name = "consent_given_at")
+    private LocalDateTime consentGivenAt;
+
     public UserEntity() {
     }
 
@@ -72,5 +75,13 @@ public class UserEntity extends BaseEntity {
 
     public void setLastLoginAt(LocalDateTime lastLoginAt) {
         this.lastLoginAt = lastLoginAt;
+    }
+
+    public LocalDateTime getConsentGivenAt() {
+        return consentGivenAt;
+    }
+
+    public void setConsentGivenAt(LocalDateTime consentGivenAt) {
+        this.consentGivenAt = consentGivenAt;
     }
 }

@@ -13,6 +13,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -63,6 +64,30 @@ class AuthServiceTest {
         assertThat(savedUser.getEmail()).isEqualTo("test@example.com");
         assertThat(savedUser.getPasswordHash()).isEqualTo("$2a$10$hashedPassword");
         assertThat(savedUser.getFirstName()).isEqualTo("Martin");
+    }
+
+    @Test
+    void should_PersistConsentGivenAt_When_Registering() {
+        // Arrange
+        RegisterRequest request = new RegisterRequest("test@example.com", "password123", "Martin", true);
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode("password123")).thenReturn("$2a$10$hashedPassword");
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(jwtTokenProvider.generateAccessToken(any(UUID.class))).thenReturn("access-token");
+        when(jwtTokenProvider.generateRefreshToken(any(UUID.class))).thenReturn("refresh-token");
+
+        LocalDateTime before = LocalDateTime.now();
+
+        // Act
+        authService.register(request);
+
+        // Assert
+        ArgumentCaptor<UserEntity> userCaptor = ArgumentCaptor.forClass(UserEntity.class);
+        verify(userRepository, times(2)).save(userCaptor.capture());
+        UserEntity savedUser = userCaptor.getAllValues().get(0);
+        assertThat(savedUser.getConsentGivenAt())
+                .isNotNull()
+                .isAfterOrEqualTo(before);
     }
 
     @Test
