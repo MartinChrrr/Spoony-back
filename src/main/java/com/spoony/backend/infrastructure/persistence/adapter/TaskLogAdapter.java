@@ -83,9 +83,13 @@ public class TaskLogAdapter implements TaskLogPort {
     }
 
     @Override
-    public int findSpoonCostByTaskId(UUID taskId) {
-        return userTaskRepository.findById(taskId)
-                .map(entity -> (int) entity.getSpoonCost())
-                .orElse(0);
+    public Optional<Integer> findSpoonCostByTaskIdAndUserId(UUID taskId, UUID userId) {
+        return userTaskRepository.findByIdAndUserId(taskId, userId)
+                .map(entity -> (int) entity.getSpoonCost());
+    }
+
+    @Override
+    public boolean existsTaskForUser(UUID taskId, UUID userId) {
+        return userTaskRepository.existsByIdAndUserId(taskId, userId);
     }
 }

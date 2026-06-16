@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface JpaUserTaskRepository extends JpaRepository<UserTaskEntity, UUID> {
@@ -19,4 +20,8 @@ public interface JpaUserTaskRepository extends JpaRepository<UserTaskEntity, UUI
     List<UserTaskEntity> findByUserIdAndStatusAndDueDateLessThanEqual(UUID userId, TaskStatus status, LocalDate dueDate);
 
     List<UserTaskEntity> findByUserId(UUID userId);
+
+    Optional<UserTaskEntity> findByIdAndUserId(UUID id, UUID userId);
+
+    boolean existsByIdAndUserId(UUID id, UUID userId);
 }

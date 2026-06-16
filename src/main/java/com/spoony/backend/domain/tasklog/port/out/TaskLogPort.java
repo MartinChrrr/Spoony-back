@@ -24,5 +24,16 @@ public interface TaskLogPort {
 
     List<UserTaskLog> saveAll(List<UserTaskLog> logs);
 
-    int findSpoonCostByTaskId(UUID taskId);
+    /**
+     * Retourne le coût en cuillères de la tâche UNIQUEMENT si elle appartient à
+     * {@code userId}. Empêche l'IDOR : on ne révèle/comptabilise jamais le coût
+     * d'une tâche d'autrui. Optional.empty() = tâche inexistante OU pas la sienne.
+     */
+    Optional<Integer> findSpoonCostByTaskIdAndUserId(UUID taskId, UUID userId);
+
+    /**
+     * Vrai si la tâche existe ET appartient à {@code userId}. Utilisé à la
+     * création de log pour vérifier la propriété avant d'insérer.
+     */
+    boolean existsTaskForUser(UUID taskId, UUID userId);
 }

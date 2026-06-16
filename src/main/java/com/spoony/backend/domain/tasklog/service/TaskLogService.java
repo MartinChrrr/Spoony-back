@@ -12,6 +12,7 @@ import com.spoony.backend.domain.shared.exception.EnergyNotDeclaredException;
 import com.spoony.backend.domain.shared.exception.NoActiveTasksException;
 import com.spoony.backend.domain.shared.exception.TaskLogExpiredException;
 import com.spoony.backend.domain.shared.exception.TaskLogNotFoundException;
+import com.spoony.backend.domain.shared.exception.TaskNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -60,6 +61,13 @@ public class TaskLogService implements TaskLogUseCase {
         List<UserTaskLog> logs = new ArrayList<>();
 
         for (UUID taskId : userTaskIds) {
+            // Anti-IDOR : on refuse de créer un log pour une tâche qui n'appartient
+            // pas au user. TaskNotFoundException (404) plutôt que Forbidden pour ne
+            // pas révéler l'existence d'une tâche d'autrui (énumération d'IDs).
+            if (!taskLogPort.existsTaskForUser(taskId, userId)) {
+                throw new TaskNotFoundException();
+            }
+
             UserTaskLog taskLog = new UserTaskLog();
             taskLog.setId(UUID.randomUUID());
             taskLog.setUserId(userId);
@@ -78,6 +86,11 @@ public class TaskLogService implements TaskLogUseCase {
     @Override
     public UserTaskLog createManualLog(UUID userTaskId, UUID userId) {
         LocalDate today = LocalDate.now();
+
+        // Anti-IDOR : un user ne peut logguer que ses propres tâches.
+        if (!taskLogPort.existsTaskForUser(userTaskId, userId)) {
+            throw new TaskNotFoundException();
+        }
 
         UserTaskLog taskLog = new UserTaskLog();
         taskLog.setId(UUID.randomUUID());
@@ -123,8 +136,10 @@ public class TaskLogService implements TaskLogUseCase {
             taskLog.setCompletedAt(null);
         }
 
-        // Update spoonsUsed in energy
-        int spoonCost = taskLogPort.findSpoonCostByTaskId(taskLog.getUserTaskId());
+        // Update spoonsUsed in energy. On filtre par userId : défense en
+        // profondeur, on ne comptabilise jamais le coût d'une tâche d'autrui.
+        int spoonCost = taskLogPort.findSpoonCostByTaskIdAndUserId(taskLog.getUserTaskId(), userId)
+                .orElseThrow(TaskNotFoundException::new);
         DailyEnergy energy = energyPort.findByUserIdAndDate(userId, taskLog.getDate())
                 .orElseThrow(EnergyNotDeclaredException::new);
 

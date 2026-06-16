@@ -10,6 +10,7 @@ import com.spoony.backend.domain.tasklog.port.out.TaskLogPort;
 import com.spoony.backend.domain.shared.exception.NoActiveTasksException;
 import com.spoony.backend.domain.shared.exception.TaskLogExpiredException;
 import com.spoony.backend.domain.shared.exception.TaskLogNotFoundException;
+import com.spoony.backend.domain.shared.exception.TaskNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -123,6 +124,8 @@ class TaskLogServiceTest {
         UUID userId = UUID.randomUUID();
         UUID taskId1 = UUID.randomUUID();
         UUID taskId2 = UUID.randomUUID();
+        when(taskLogPort.existsTaskForUser(taskId1, userId)).thenReturn(true);
+        when(taskLogPort.existsTaskForUser(taskId2, userId)).thenReturn(true);
         when(taskLogPort.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
@@ -143,6 +146,7 @@ class TaskLogServiceTest {
         // Arrange
         UUID userId = UUID.randomUUID();
         UUID taskId = UUID.randomUUID();
+        when(taskLogPort.existsTaskForUser(taskId, userId)).thenReturn(true);
         when(taskLogPort.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
@@ -159,6 +163,7 @@ class TaskLogServiceTest {
         // Arrange
         UUID userId = UUID.randomUUID();
         UUID taskId = UUID.randomUUID();
+        when(taskLogPort.existsTaskForUser(taskId, userId)).thenReturn(true);
         when(taskLogPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
@@ -176,6 +181,7 @@ class TaskLogServiceTest {
         // Arrange
         UUID userId = UUID.randomUUID();
         UUID taskId = UUID.randomUUID();
+        when(taskLogPort.existsTaskForUser(taskId, userId)).thenReturn(true);
         when(taskLogPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
@@ -183,6 +189,34 @@ class TaskLogServiceTest {
 
         // Assert
         assertThat(result.isSuggested()).isFalse();
+    }
+
+    @Test
+    void should_ThrowTaskNotFound_When_ManualLogOnOtherUsersTask() {
+        // Arrange — IDOR : la tâche n'appartient pas au user → rejet, aucune insertion.
+        UUID userId = UUID.randomUUID();
+        UUID otherUsersTaskId = UUID.randomUUID();
+        when(taskLogPort.existsTaskForUser(otherUsersTaskId, userId)).thenReturn(false);
+
+        // Act & Assert
+        assertThatThrownBy(() -> taskLogService.createManualLog(otherUsersTaskId, userId))
+                .isInstanceOf(TaskNotFoundException.class);
+        verify(taskLogPort, never()).save(any());
+    }
+
+    @Test
+    void should_ThrowTaskNotFound_When_BulkContainsOtherUsersTask() {
+        // Arrange — un seul ID étranger dans le lot suffit à tout rejeter.
+        UUID userId = UUID.randomUUID();
+        UUID ownTaskId = UUID.randomUUID();
+        UUID otherUsersTaskId = UUID.randomUUID();
+        when(taskLogPort.existsTaskForUser(ownTaskId, userId)).thenReturn(true);
+        when(taskLogPort.existsTaskForUser(otherUsersTaskId, userId)).thenReturn(false);
+
+        // Act & Assert
+        assertThatThrownBy(() -> taskLogService.createLogs(List.of(ownTaskId, otherUsersTaskId), userId))
+                .isInstanceOf(TaskNotFoundException.class);
+        verify(taskLogPort, never()).saveAll(any());
     }
 
     // --- updateStatus ---
@@ -200,7 +234,7 @@ class TaskLogServiceTest {
         DailyEnergy energy = createEnergy(userId, 8, 2);
 
         when(taskLogPort.findById(logId)).thenReturn(Optional.of(log));
-        when(taskLogPort.findSpoonCostByTaskId(log.getUserTaskId())).thenReturn(3);
+        when(taskLogPort.findSpoonCostByTaskIdAndUserId(log.getUserTaskId(), userId)).thenReturn(Optional.of(3));
         when(energyPort.findByUserIdAndDate(userId, LocalDate.now())).thenReturn(Optional.of(energy));
         when(taskLogPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(energyPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -228,7 +262,7 @@ class TaskLogServiceTest {
         DailyEnergy energy = createEnergy(userId, 8, 5);
 
         when(taskLogPort.findById(logId)).thenReturn(Optional.of(log));
-        when(taskLogPort.findSpoonCostByTaskId(log.getUserTaskId())).thenReturn(3);
+        when(taskLogPort.findSpoonCostByTaskIdAndUserId(log.getUserTaskId(), userId)).thenReturn(Optional.of(3));
         when(energyPort.findByUserIdAndDate(userId, LocalDate.now())).thenReturn(Optional.of(energy));
         when(taskLogPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(energyPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -255,7 +289,7 @@ class TaskLogServiceTest {
         DailyEnergy energy = createEnergy(userId, 8, 0);
 
         when(taskLogPort.findById(logId)).thenReturn(Optional.of(log));
-        when(taskLogPort.findSpoonCostByTaskId(log.getUserTaskId())).thenReturn(2);
+        when(taskLogPort.findSpoonCostByTaskIdAndUserId(log.getUserTaskId(), userId)).thenReturn(Optional.of(2));
         when(energyPort.findByUserIdAndDate(userId, LocalDate.now())).thenReturn(Optional.of(energy));
         when(taskLogPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(energyPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -281,7 +315,7 @@ class TaskLogServiceTest {
         DailyEnergy energy = createEnergy(userId, 8, 3);
 
         when(taskLogPort.findById(logId)).thenReturn(Optional.of(log));
-        when(taskLogPort.findSpoonCostByTaskId(log.getUserTaskId())).thenReturn(2);
+        when(taskLogPort.findSpoonCostByTaskIdAndUserId(log.getUserTaskId(), userId)).thenReturn(Optional.of(2));
         when(energyPort.findByUserIdAndDate(userId, LocalDate.now())).thenReturn(Optional.of(energy));
         when(taskLogPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(energyPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
@@ -350,7 +384,7 @@ class TaskLogServiceTest {
         DailyEnergy energy = createEnergy(userId, 8, 0);
 
         when(taskLogPort.findById(logId)).thenReturn(Optional.of(log));
-        when(taskLogPort.findSpoonCostByTaskId(log.getUserTaskId())).thenReturn(2);
+        when(taskLogPort.findSpoonCostByTaskIdAndUserId(log.getUserTaskId(), userId)).thenReturn(Optional.of(2));
         when(energyPort.findByUserIdAndDate(userId, log.getDate())).thenReturn(Optional.of(energy));
         when(taskLogPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
         when(energyPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));

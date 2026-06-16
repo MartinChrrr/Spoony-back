@@ -33,6 +33,7 @@ public class TaskLogApplicationService {
         return taskLogUseCase.createLogs(userTaskIds, userId);
     }
 
+    @Transactional
     public UserTaskLog createManualLog(UUID userTaskId, UUID userId) {
         return taskLogUseCase.createManualLog(userTaskId, userId);
     }
