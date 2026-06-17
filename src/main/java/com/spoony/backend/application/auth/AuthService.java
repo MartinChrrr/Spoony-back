@@ -108,6 +108,17 @@ public class AuthService {
         return generateTokens(user);
     }
 
+    @Transactional
+    public void logout(UUID userId) {
+        UserEntity user = userRepository.findById(userId)
+                .orElseThrow(InvalidCredentialsException::new);
+
+        user.setRefreshTokenHash(null);
+        userRepository.save(user);
+
+        log.info("User logged out userId={}", userId);
+    }
+
     private AuthResponse generateTokens(UserEntity user) {
         String accessToken = jwtTokenProvider.generateAccessToken(user.getId());
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());

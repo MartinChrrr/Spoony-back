@@ -8,10 +8,13 @@ import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.UUID;
 
 @RestController
 @RequestMapping(value = "/api/auth", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -49,5 +52,20 @@ public class AuthController {
     public ResponseEntity<JSendResponse<AuthResponse>> refresh(@Valid @RequestBody RefreshRequest request) {
         AuthResponse response = authService.refresh(request);
         return ResponseEntity.ok(JSendResponse.success(response));
+    }
+
+    @PostMapping("/logout")
+    @Operation(summary = "Déconnexion", description = "Révoque le refresh token de l'utilisateur authentifié")
+    @ApiResponse(responseCode = "204", description = "Déconnexion réussie")
+    @ApiResponse(responseCode = "401", description = "Token absent ou invalide")
+    public ResponseEntity<Void> logout() {
+        authService.logout(getCurrentUserId());
+        return ResponseEntity.noContent().build();
+    }
+
+    private UUID getCurrentUserId() {
+        String principal = (String) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+        return UUID.fromString(principal);
     }
 }
