@@ -7,3 +7,8 @@ target/
 *.iml
 .vscode/
 .claude/
+# Never bake local secrets or infra/compose into the image build context.
+.env
+.env.*
+docker-compose.yml
+infra/

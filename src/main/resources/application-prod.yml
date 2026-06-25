@@ -21,6 +21,12 @@ spring:
   lifecycle:
     timeout-per-shutdown-phase: 30s
 
+  flyway:
+    # The common application.yml sets baseline-on-migrate=true (convenient for dev
+    # on a pre-existing DB). In prod the target RDS must be EMPTY on first boot so
+    # V1..V7 apply cleanly — refuse any silent baselining that would skip migrations.
+    baseline-on-migrate: false
+
 jwt:
   secret: ${JWT_SECRET}
   access-expiration: ${JWT_ACCESS_EXPIRATION:900000}
@@ -32,6 +38,10 @@ app:
 
 server:
   shutdown: graceful
+  # Behind the ALB, honour X-Forwarded-* so the app sees the real client IP and
+  # scheme. Without this, the rate limiter keys on the ALB's IP (one shared bucket
+  # for every user => self-inflicted DoS on /api/auth/**) and isSecure()/HSTS break.
+  forward-headers-strategy: framework
   tomcat:
     threads:
       max: 200

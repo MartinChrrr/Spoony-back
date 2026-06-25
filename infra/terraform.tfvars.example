@@ -1,0 +1,51 @@
+# -----------------------------------------------------------------------------
+# Example variable values for the Spoony backend infrastructure.
+# Copy to terraform.tfvars and adjust. Do NOT commit terraform.tfvars.
+# -----------------------------------------------------------------------------
+
+# AWS region (Paris). All health data stays in the EU.
+region = "eu-west-3"
+
+# Naming
+project_name = "spoony"
+environment  = "prod"
+
+# Networking (any /16 that does not clash with your other VPCs)
+vpc_cidr = "10.20.0.0/16"
+
+# Container image.
+# Keep the busybox placeholder for the very first `terraform apply` (ECS rejects
+# an empty image). The CD pipeline (or a manual `docker push`) then provides the
+# real image, and Terraform ignores task_definition changes afterwards. Example
+# once an image exists:
+# container_image = "123456789012.dkr.ecr.eu-west-3.amazonaws.com/spoony-backend:abc1234"
+container_image = "public.ecr.aws/docker/library/busybox:latest"
+
+# Task sizing (cost-optimised V0)
+container_cpu    = 512
+container_memory = 1024
+desired_count    = 1
+
+# Database
+db_instance_class    = "db.t4g.micro"
+db_allocated_storage = 20
+db_name              = "spoony"
+db_username          = "spoony"
+
+# CORS: origins allowed by the backend (comma separated, no spaces).
+# Use the real mobile/web origins; "*" is NOT recommended for an authenticated API.
+cors_allowed_origins = "https://app.spoony.example,https://spoony.example"
+
+# JWT access token TTL in milliseconds (15 min default).
+jwt_access_expiration = "900000"
+
+# HTTPS (optional). Leave empty for HTTP-only (NOT for real prod).
+# Provide an ACM cert ARN *in eu-west-3* to enable the HTTPS:443 listener.
+# acm_certificate_arn = "arn:aws:acm:eu-west-3:123456789012:certificate/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+acm_certificate_arn = ""
+
+# GitHub repo allowed to deploy via OIDC.
+github_repo = "MartinChrrr/Spoony-back"
+
+# Log retention
+log_retention_days = 30

@@ -1,0 +1,94 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# OIDC: request a token to assume the AWS deploy role; read the repo contents.
+permissions:
+  id-token: write
+  contents: read
+
+# Serialise deploys on the same ref (do not cancel a running deploy: an aborted
+# ECS rollout could leave the service half-updated).
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  AWS_REGION: eu-west-3
+  CONTAINER_NAME: app
+
+jobs:
+  deploy:
+    name: Build, scan and deploy
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials (OIDC)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # Build locally (load into the runner's Docker) but do NOT push yet: the
+      # Trivy scan below gates the push.
+      - name: Build Docker image (no push)
+        env:
+          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
+          REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
+        run: |
+          IMAGE_SHA="${REGISTRY}/${REPOSITORY}:${GITHUB_SHA}"
+          IMAGE_SHORT="${REGISTRY}/${REPOSITORY}:sha-${GITHUB_SHA::7}"
+          docker build -t "$IMAGE_SHA" -t "$IMAGE_SHORT" .
+          echo "IMAGE_SHA=$IMAGE_SHA" >> "$GITHUB_ENV"
+          echo "IMAGE_SHORT=$IMAGE_SHORT" >> "$GITHUB_ENV"
+
+      # GATING: fail the job on any fixable CRITICAL/HIGH vulnerability.
+      - name: Scan image with Trivy
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.IMAGE_SHA }}
+          format: table
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          ignore-unfixed: true
+
+      - name: Push image to ECR
+        run: |
+          docker push "$IMAGE_SHA"
+          docker push "$IMAGE_SHORT"
+
+      # Pull the live task definition so we only swap the image, preserving every
+      # other field (env, secrets, roles) managed by Terraform.
+      - name: Download current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "${{ secrets.ECS_TASK_FAMILY }}" \
+            --query 'taskDefinition' \
+            --output json > task-definition.json
+
+      - name: Render new image into the task definition
+        id: render
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-definition.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ env.IMAGE_SHA }}
+
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v2
+        with:
+          task-definition: ${{ steps.render.outputs.task-definition }}
+          service: ${{ secrets.ECS_SERVICE }}
+          cluster: ${{ secrets.ECS_CLUSTER }}
+          wait-for-service-stability: true
