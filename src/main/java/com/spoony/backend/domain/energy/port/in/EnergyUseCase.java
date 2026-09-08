@@ -11,6 +11,4 @@ public interface EnergyUseCase {
     DailyEnergy declareEnergy(int spoons, UUID userId);
 
     DailyEnergy updateSpoons(int spoons, UUID userId);
-
-    DailyEnergy updateMood(String moodEnd, UUID userId);
 }

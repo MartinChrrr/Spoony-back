@@ -73,22 +73,6 @@ class EnergyApplicationServiceTest {
         verify(energyUseCase).getTodayEnergy(userId);
     }
 
-    @Test
-    void should_DelegateUpdateMood_When_Called() {
-        // Arrange
-        UUID userId = UUID.randomUUID();
-        DailyEnergy energy = createEnergy(userId, 8);
-        energy.setMoodEnd("content");
-        when(energyUseCase.updateMood("content", userId)).thenReturn(energy);
-
-        // Act
-        DailyEnergy result = service.updateMood("content", userId);
-
-        // Assert
-        assertThat(result.getMoodEnd()).isEqualTo("content");
-        verify(energyUseCase).updateMood("content", userId);
-    }
-
     // --- helper ---
 
     private DailyEnergy createEnergy(UUID userId, int spoons) {

@@ -5,7 +5,6 @@ import com.spoony.backend.domain.energy.port.out.EnergyPort;
 import com.spoony.backend.domain.energy.service.EnergyService;
 import com.spoony.backend.domain.shared.port.out.TaskPostponePort;
 import com.spoony.backend.domain.task.port.in.TaskUseCase;
-import com.spoony.backend.domain.task.port.out.BaseTaskPort;
 import com.spoony.backend.domain.task.port.out.TaskPort;
 import com.spoony.backend.domain.task.service.TaskService;
 import com.spoony.backend.domain.tasklog.port.in.TaskLogUseCase;
@@ -24,8 +23,8 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 public class BeanConfig {
 
     @Bean
-    public TaskUseCase taskUseCase(TaskPort taskPort, BaseTaskPort baseTaskPort) {
-        return new TaskService(taskPort, baseTaskPort);
+    public TaskUseCase taskUseCase(TaskPort taskPort) {
+        return new TaskService(taskPort);
     }
 
     @Bean

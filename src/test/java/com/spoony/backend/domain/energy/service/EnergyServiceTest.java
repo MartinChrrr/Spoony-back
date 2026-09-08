@@ -258,38 +258,6 @@ class EnergyServiceTest {
         order.verify(taskPostponePort).postponeAllActiveTasks(any(), any(), any());
     }
 
-    // --- updateMood ---
-
-    @Test
-    void should_UpdateMood_When_EnergyExists() {
-        // Arrange
-        UUID userId = UUID.randomUUID();
-        DailyEnergy existing = createEnergy(userId, 8);
-        when(energyPort.findByUserIdAndDate(userId, LocalDate.now()))
-                .thenReturn(Optional.of(existing));
-        when(energyPort.save(any(DailyEnergy.class)))
-                .thenAnswer(invocation -> invocation.getArgument(0));
-
-        // Act
-        DailyEnergy result = energyService.updateMood("content", userId);
-
-        // Assert
-        assertThat(result.getMoodEnd()).isEqualTo("content");
-        verify(energyPort).save(any(DailyEnergy.class));
-    }
-
-    @Test
-    void should_ThrowNotDeclared_When_UpdateMoodNotExists() {
-        // Arrange
-        UUID userId = UUID.randomUUID();
-        when(energyPort.findByUserIdAndDate(userId, LocalDate.now()))
-                .thenReturn(Optional.empty());
-
-        // Act & Assert
-        assertThatThrownBy(() -> energyService.updateMood("content", userId))
-                .isInstanceOf(EnergyNotDeclaredException.class);
-    }
-
     // --- helper ---
 
     private DailyEnergy createEnergy(UUID userId, int spoons) {

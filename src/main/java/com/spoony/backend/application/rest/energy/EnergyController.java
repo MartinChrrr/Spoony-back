@@ -12,7 +12,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -70,21 +69,6 @@ public class EnergyController {
             @Valid @RequestBody UpdateSpoonsRequest request) {
         UUID userId = getCurrentUserId();
         DailyEnergy energy = energyApplicationService.updateSpoons(request.getSpoons(), userId);
-        return ResponseEntity.ok(JSendResponse.success(EnergyResponse.fromDomain(energy)));
-    }
-
-    @PatchMapping("/today/mood")
-    @Operation(
-            summary = "Enregistrer l'humeur de fin de journée",
-            description = "Met à jour l'humeur de fin de journée"
-    )
-    @ApiResponse(responseCode = "200", description = "Humeur mise à jour")
-    @ApiResponse(responseCode = "404", description = "Énergie non déclarée")
-    @ApiResponse(responseCode = "400", description = "Erreur de validation")
-    public ResponseEntity<JSendResponse<EnergyResponse>> updateMood(
-            @Valid @RequestBody UpdateMoodRequest request) {
-        UUID userId = getCurrentUserId();
-        DailyEnergy energy = energyApplicationService.updateMood(request.getMoodEnd(), userId);
         return ResponseEntity.ok(JSendResponse.success(EnergyResponse.fromDomain(energy)));
     }
 

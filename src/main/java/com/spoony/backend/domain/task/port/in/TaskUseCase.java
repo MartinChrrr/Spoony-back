@@ -1,6 +1,5 @@
 package com.spoony.backend.domain.task.port.in;
 
-import com.spoony.backend.domain.task.model.TaskFromCatalogCommand;
 import com.spoony.backend.domain.task.model.UserTask;
 
 import java.util.List;
@@ -20,6 +19,4 @@ public interface TaskUseCase {
     UserTask update(UUID id, UserTask task, UUID userId);
 
     void archive(UUID id, UUID userId);
-
-    List<UserTask> createFromCatalog(List<TaskFromCatalogCommand> commands, UUID userId);
 }

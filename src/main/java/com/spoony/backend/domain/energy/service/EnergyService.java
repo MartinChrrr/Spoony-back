@@ -72,15 +72,4 @@ public class EnergyService implements EnergyUseCase {
         return saved;
     }
 
-    @Override
-    public DailyEnergy updateMood(String moodEnd, UUID userId) {
-        LocalDate today = LocalDate.now();
-        DailyEnergy existing = energyPort.findByUserIdAndDate(userId, today)
-                .orElseThrow(EnergyNotDeclaredException::new);
-
-        existing.setMoodEnd(moodEnd);
-        DailyEnergy saved = energyPort.save(existing);
-        log.info("Mood updated userId={} moodEnd={}", userId, moodEnd);
-        return saved;
-    }
 }

@@ -36,8 +36,4 @@ public class EnergyApplicationService {
     public DailyEnergy updateSpoons(int spoons, UUID userId) {
         return energyUseCase.updateSpoons(spoons, userId);
     }
-
-    public DailyEnergy updateMood(String moodEnd, UUID userId) {
-        return energyUseCase.updateMood(moodEnd, userId);
-    }
 }
