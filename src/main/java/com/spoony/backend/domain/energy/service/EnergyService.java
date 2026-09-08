@@ -9,6 +9,7 @@ import com.spoony.backend.domain.shared.exception.EnergyNotDeclaredException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.UUID;
 
@@ -18,22 +19,24 @@ public class EnergyService implements EnergyUseCase {
 
     private final EnergyPort energyPort;
     private final TaskPostponePort taskPostponePort;
+    private final Clock clock;
 
-    public EnergyService(EnergyPort energyPort, TaskPostponePort taskPostponePort) {
+    public EnergyService(EnergyPort energyPort, TaskPostponePort taskPostponePort, Clock clock) {
         this.energyPort = energyPort;
         this.taskPostponePort = taskPostponePort;
+        this.clock = clock;
     }
 
     @Override
     public DailyEnergy getTodayEnergy(UUID userId) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
         return energyPort.findByUserIdAndDate(userId, today)
                 .orElseThrow(EnergyNotDeclaredException::new);
     }
 
     @Override
     public DailyEnergy declareEnergy(int spoons, UUID userId) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
 
         energyPort.findByUserIdAndDate(userId, today)
                 .ifPresent(existing -> {
@@ -55,7 +58,7 @@ public class EnergyService implements EnergyUseCase {
 
     @Override
     public DailyEnergy updateSpoons(int spoons, UUID userId) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
         DailyEnergy existing = energyPort.findByUserIdAndDate(userId, today)
                 .orElseThrow(EnergyNotDeclaredException::new);
 

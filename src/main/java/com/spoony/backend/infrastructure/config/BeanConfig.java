@@ -16,29 +16,42 @@ import com.spoony.backend.domain.suggestion.service.SuggestionService;
 import com.spoony.backend.domain.suggestion.strategy.DefaultSuggestionStrategy;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.EnableScheduling;
+
+import java.time.Clock;
+import java.time.ZoneId;
 
 @Configuration
 @EnableScheduling
 public class BeanConfig {
 
     @Bean
-    public TaskUseCase taskUseCase(TaskPort taskPort) {
-        return new TaskService(taskPort);
+    public Clock businessClock(@Value("${app.business-time-zone:Europe/Paris}") String businessTimeZone) {
+        return Clock.system(ZoneId.of(businessTimeZone));
     }
 
     @Bean
-    public EnergyUseCase energyUseCase(EnergyPort energyPort, TaskPostponePort taskPostponePort) {
-        return new EnergyService(energyPort, taskPostponePort);
+    public TaskUseCase taskUseCase(TaskPort taskPort, Clock businessClock) {
+        return new TaskService(taskPort, businessClock);
     }
 
     @Bean
-    public TaskLogUseCase taskLogUseCase(TaskLogPort taskLogPort, EnergyPort energyPort, TaskPostponePort taskPostponePort) {
-        return new TaskLogService(taskLogPort, energyPort, taskPostponePort);
+    public EnergyUseCase energyUseCase(EnergyPort energyPort, TaskPostponePort taskPostponePort, Clock businessClock) {
+        return new EnergyService(energyPort, taskPostponePort, businessClock);
     }
 
     @Bean
-    public SuggestionUseCase suggestionUseCase(TaskPort taskPort, EnergyPort energyPort, SuggestionPort suggestionPort, TaskLogPort taskLogPort) {
-        return new SuggestionService(taskPort, energyPort, suggestionPort, taskLogPort, new DefaultSuggestionStrategy());
+    public TaskLogUseCase taskLogUseCase(TaskLogPort taskLogPort, EnergyPort energyPort,
+                                         TaskPostponePort taskPostponePort, Clock businessClock) {
+        return new TaskLogService(taskLogPort, energyPort, taskPostponePort, businessClock);
+    }
+
+    @Bean
+    public SuggestionUseCase suggestionUseCase(TaskPort taskPort, EnergyPort energyPort,
+                                               SuggestionPort suggestionPort, TaskLogPort taskLogPort,
+                                               Clock businessClock) {
+        return new SuggestionService(taskPort, energyPort, suggestionPort, taskLogPort,
+                new DefaultSuggestionStrategy(businessClock), businessClock);
     }
 }

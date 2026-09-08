@@ -6,6 +6,7 @@ import com.spoony.backend.domain.task.model.UserTask;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
@@ -20,7 +21,7 @@ class DefaultSuggestionStrategyTest {
 
     @BeforeEach
     void setUp() {
-        strategy = new DefaultSuggestionStrategy();
+        strategy = new DefaultSuggestionStrategy(Clock.systemDefaultZone());
     }
 
     // --- filtering ---

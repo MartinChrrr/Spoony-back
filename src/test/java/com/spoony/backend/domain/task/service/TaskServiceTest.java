@@ -12,7 +12,10 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -32,7 +35,7 @@ class TaskServiceTest {
 
     @BeforeEach
     void setUp() {
-        taskService = new TaskService(taskPort);
+        taskService = new TaskService(taskPort, Clock.systemDefaultZone());
     }
 
     @Test
@@ -123,6 +126,42 @@ class TaskServiceTest {
         assertThat(result.getImportance()).isEqualTo(Importance.MEDIUM);
         assertThat(result.getDueDate()).isEqualTo(LocalDate.now());
         assertThat(result.getStatus()).isEqualTo(TaskStatus.ACTIVE);
+    }
+
+    @Test
+    void should_UseParisBusinessDate_When_UtcIsStillPreviousDay() {
+        Clock parisClock = Clock.fixed(
+                Instant.parse("2026-03-28T23:30:00Z"),
+                ZoneId.of("Europe/Paris")
+        );
+        TaskService service = new TaskService(taskPort, parisClock);
+        UserTask task = new UserTask();
+        task.setName("Autour de minuit");
+        when(taskPort.save(any(UserTask.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UserTask result = service.create(task, UUID.randomUUID());
+
+        assertThat(result.getDueDate()).isEqualTo(LocalDate.of(2026, 3, 29));
+    }
+
+    @Test
+    void should_KeepSameParisDate_OnBothSidesOfAutumnDstOverlap() {
+        ZoneId paris = ZoneId.of("Europe/Paris");
+        UserTask first = new UserTask();
+        first.setName("Avant le recul");
+        UserTask second = new UserTask();
+        second.setName("Après le recul");
+        when(taskPort.save(any(UserTask.class))).thenAnswer(invocation -> invocation.getArgument(0));
+
+        UserTask firstResult = new TaskService(
+                taskPort, Clock.fixed(Instant.parse("2026-10-25T00:30:00Z"), paris)
+        ).create(first, UUID.randomUUID());
+        UserTask secondResult = new TaskService(
+                taskPort, Clock.fixed(Instant.parse("2026-10-25T01:30:00Z"), paris)
+        ).create(second, UUID.randomUUID());
+
+        assertThat(firstResult.getDueDate()).isEqualTo(LocalDate.of(2026, 10, 25));
+        assertThat(secondResult.getDueDate()).isEqualTo(LocalDate.of(2026, 10, 25));
     }
 
     @Test

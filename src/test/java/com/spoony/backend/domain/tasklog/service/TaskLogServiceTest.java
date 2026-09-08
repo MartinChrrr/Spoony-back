@@ -18,6 +18,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -45,7 +46,7 @@ class TaskLogServiceTest {
 
     @BeforeEach
     void setUp() {
-        taskLogService = new TaskLogService(taskLogPort, energyPort, taskPostponePort);
+        taskLogService = new TaskLogService(taskLogPort, energyPort, taskPostponePort, Clock.systemDefaultZone());
     }
 
     // --- getTodayLogs ---

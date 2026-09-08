@@ -6,6 +6,7 @@ import com.spoony.backend.domain.task.model.UserTask;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -17,6 +18,11 @@ import java.util.UUID;
 public class DefaultSuggestionStrategy implements SuggestionStrategy {
 
     private static final Logger log = LoggerFactory.getLogger(DefaultSuggestionStrategy.class);
+    private final Clock clock;
+
+    public DefaultSuggestionStrategy(Clock clock) {
+        this.clock = clock;
+    }
 
     @Override
     public List<Suggestion> suggest(List<UserTask> tasks, int availableSpoons, Map<UUID, LocalDateTime> lastCompletions) {
@@ -70,7 +76,7 @@ public class DefaultSuggestionStrategy implements SuggestionStrategy {
         if (last == null) {
             return 30; // never completed → treat as 30 days
         }
-        return ChronoUnit.DAYS.between(last, LocalDateTime.now());
+        return ChronoUnit.DAYS.between(last, LocalDateTime.now(clock));
     }
 
     double computeFrequencyWeight(long daysSinceCompletion) {

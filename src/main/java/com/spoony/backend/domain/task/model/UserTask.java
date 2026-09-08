@@ -12,7 +12,7 @@ public class UserTask {
     private int spoonCost = 2;
     private Importance importance = Importance.MEDIUM;
     private String category;
-    private LocalDate dueDate = LocalDate.now();
+    private LocalDate dueDate;
     private String notes;
     private TaskStatus status = TaskStatus.ACTIVE;
     private LocalDateTime completedAt;

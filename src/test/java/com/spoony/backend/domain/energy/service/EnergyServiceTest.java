@@ -12,6 +12,7 @@ import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.Optional;
 import java.util.UUID;
@@ -38,7 +39,7 @@ class EnergyServiceTest {
 
     @BeforeEach
     void setUp() {
-        energyService = new EnergyService(energyPort, taskPostponePort);
+        energyService = new EnergyService(energyPort, taskPostponePort, Clock.systemDefaultZone());
     }
 
     // --- getTodayEnergy ---

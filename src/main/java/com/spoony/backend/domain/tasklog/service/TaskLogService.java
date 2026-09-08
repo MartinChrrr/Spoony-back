@@ -17,6 +17,7 @@ import com.spoony.backend.domain.shared.exception.SpoonBalanceConflictException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -30,16 +31,19 @@ public class TaskLogService implements TaskLogUseCase {
     private final TaskLogPort taskLogPort;
     private final EnergyPort energyPort;
     private final TaskPostponePort taskPostponePort;
+    private final Clock clock;
 
-    public TaskLogService(TaskLogPort taskLogPort, EnergyPort energyPort, TaskPostponePort taskPostponePort) {
+    public TaskLogService(TaskLogPort taskLogPort, EnergyPort energyPort,
+                          TaskPostponePort taskPostponePort, Clock clock) {
         this.taskLogPort = taskLogPort;
         this.energyPort = energyPort;
         this.taskPostponePort = taskPostponePort;
+        this.clock = clock;
     }
 
     @Override
     public List<UserTaskLog> getTodayLogs(UUID userId, boolean includeArchived) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
         if (includeArchived) {
             return taskLogPort.findByUserIdAndDate(userId, today);
         }
@@ -58,7 +62,7 @@ public class TaskLogService implements TaskLogUseCase {
 
     @Override
     public List<UserTaskLog> createLogs(List<UUID> userTaskIds, UUID userId) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
         List<UserTaskLog> logs = new ArrayList<>();
 
         for (UUID taskId : userTaskIds) {
@@ -87,7 +91,7 @@ public class TaskLogService implements TaskLogUseCase {
 
     @Override
     public UserTaskLog createManualLog(UUID userTaskId, UUID userId) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
 
         // Anti-IDOR : un user ne peut logguer que ses propres tâches.
         TaskSnapshot snapshot = taskLogPort.findActiveTaskSnapshotForUser(userTaskId, userId)
@@ -118,7 +122,7 @@ public class TaskLogService implements TaskLogUseCase {
         }
 
         // Règle J+1 : modification autorisée si log.date >= today - 1
-        LocalDate cutoff = LocalDate.now().minusDays(1);
+        LocalDate cutoff = LocalDate.now(clock).minusDays(1);
         if (taskLog.getDate().isBefore(cutoff)) {
             throw new TaskLogExpiredException();
         }
@@ -133,7 +137,7 @@ public class TaskLogService implements TaskLogUseCase {
 
         // Update completedAt
         if (newStatus == TaskLogStatus.COMPLETED) {
-            taskLog.setCompletedAt(LocalDateTime.now());
+            taskLog.setCompletedAt(LocalDateTime.now(clock));
         }
         if (oldStatus == TaskLogStatus.COMPLETED) {
             taskLog.setCompletedAt(null);
@@ -165,7 +169,7 @@ public class TaskLogService implements TaskLogUseCase {
 
     @Override
     public BulkPostponeResult bulkPostpone(UUID userId, LocalDate targetDate) {
-        LocalDate today = LocalDate.now();
+        LocalDate today = LocalDate.now(clock);
         LocalDate newDate = targetDate != null ? targetDate : today.plusDays(1);
 
         int count = taskPostponePort.postponeAllActiveTasks(userId, today, newDate);

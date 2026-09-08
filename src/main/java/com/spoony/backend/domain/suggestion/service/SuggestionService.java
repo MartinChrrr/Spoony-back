@@ -15,6 +15,7 @@ import com.spoony.backend.domain.shared.exception.EnergyNotDeclaredException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -32,20 +33,23 @@ public class SuggestionService implements SuggestionUseCase {
     private final SuggestionPort suggestionPort;
     private final TaskLogPort taskLogPort;
     private final SuggestionStrategy strategy;
+    private final Clock clock;
 
     public SuggestionService(TaskPort taskPort, EnergyPort energyPort,
                              SuggestionPort suggestionPort, TaskLogPort taskLogPort,
-                             SuggestionStrategy strategy) {
+                             SuggestionStrategy strategy, Clock clock) {
         this.taskPort = taskPort;
         this.energyPort = energyPort;
         this.suggestionPort = suggestionPort;
         this.taskLogPort = taskLogPort;
         this.strategy = strategy;
+        this.clock = clock;
     }
 
     @Override
     public List<Suggestion> getSuggestions(UUID userId) {
-        DailyEnergy energy = energyPort.findByUserIdAndDate(userId, LocalDate.now())
+        LocalDate today = LocalDate.now(clock);
+        DailyEnergy energy = energyPort.findByUserIdAndDate(userId, today)
                 .orElseThrow(EnergyNotDeclaredException::new);
 
         int availableSpoons = energy.getSpoons() - energy.getSpoonsUsed();
@@ -64,7 +68,7 @@ public class SuggestionService implements SuggestionUseCase {
 
         // Exclure les tâches déjà loggées aujourd'hui (PLANNED/COMPLETED/SKIPPED),
         // sinon step3 re-suggère des tâches déjà planifiées ou faites du jour (audit M5).
-        Set<UUID> loggedTodayTaskIds = taskLogPort.findByUserIdAndDate(userId, LocalDate.now()).stream()
+        Set<UUID> loggedTodayTaskIds = taskLogPort.findByUserIdAndDate(userId, today).stream()
                 .map(UserTaskLog::getUserTaskId)
                 .collect(Collectors.toSet());
 

@@ -19,6 +19,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collection;
@@ -57,7 +58,8 @@ class SuggestionServiceTest {
 
     @BeforeEach
     void setUp() {
-        suggestionService = new SuggestionService(taskPort, energyPort, suggestionPort, taskLogPort, strategy);
+        suggestionService = new SuggestionService(
+                taskPort, energyPort, suggestionPort, taskLogPort, strategy, Clock.systemDefaultZone());
     }
 
     @Test

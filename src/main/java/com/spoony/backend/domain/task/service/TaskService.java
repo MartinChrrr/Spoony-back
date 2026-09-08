@@ -9,6 +9,7 @@ import com.spoony.backend.domain.shared.exception.TaskNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -19,9 +20,11 @@ public class TaskService implements TaskUseCase {
     private static final Logger log = LoggerFactory.getLogger(TaskService.class);
 
     private final TaskPort taskPort;
+    private final Clock clock;
 
-    public TaskService(TaskPort taskPort) {
+    public TaskService(TaskPort taskPort, Clock clock) {
         this.taskPort = taskPort;
+        this.clock = clock;
     }
 
     @Override
@@ -31,7 +34,7 @@ public class TaskService implements TaskUseCase {
 
     @Override
     public List<UserTask> findOverdueByUserId(UUID userId) {
-        return taskPort.findByUserIdAndDueDateBeforeAndStatus(userId, LocalDate.now(), TaskStatus.ACTIVE);
+        return taskPort.findByUserIdAndDueDateBeforeAndStatus(userId, LocalDate.now(clock), TaskStatus.ACTIVE);
     }
 
     @Override
@@ -53,7 +56,7 @@ public class TaskService implements TaskUseCase {
             task.setImportance(Importance.MEDIUM);
         }
         if (task.getDueDate() == null) {
-            task.setDueDate(LocalDate.now());
+            task.setDueDate(LocalDate.now(clock));
         }
 
         UserTask saved = taskPort.save(task);

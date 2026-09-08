@@ -11,6 +11,7 @@ import com.spoony.backend.infrastructure.persistence.repository.JpaUserTaskLogRe
 import com.spoony.backend.infrastructure.persistence.repository.JpaUserTaskRepository;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
@@ -22,10 +23,14 @@ public class TaskLogAdapter implements TaskLogPort {
 
     private final JpaUserTaskLogRepository taskLogRepository;
     private final JpaUserTaskRepository userTaskRepository;
+    private final Clock clock;
 
-    public TaskLogAdapter(JpaUserTaskLogRepository taskLogRepository, JpaUserTaskRepository userTaskRepository) {
+    public TaskLogAdapter(JpaUserTaskLogRepository taskLogRepository,
+                          JpaUserTaskRepository userTaskRepository,
+                          Clock clock) {
         this.taskLogRepository = taskLogRepository;
         this.userTaskRepository = userTaskRepository;
+        this.clock = clock;
     }
 
     @Override
@@ -44,7 +49,7 @@ public class TaskLogAdapter implements TaskLogPort {
 
     @Override
     public List<UserTaskLog> findByUserIdAndDateExcludeArchived(UUID userId, LocalDate date) {
-        LocalDateTime cutoff = LocalDateTime.now().minusHours(24);
+        LocalDateTime cutoff = LocalDateTime.now(clock).minusHours(24);
         return taskLogRepository.findByUserIdAndDate(userId, date).stream()
                 .map(TaskLogMapper::toDomain)
                 .filter(log -> !(log.getStatus() == TaskLogStatus.COMPLETED
