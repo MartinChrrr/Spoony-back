@@ -1,6 +1,7 @@
 package com.spoony.backend.application.rest.common;
 
 import com.spoony.backend.domain.shared.exception.BusinessException;
+import com.spoony.backend.infrastructure.web.PayloadTooLargeException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -59,12 +60,17 @@ public class GlobalExceptionHandler {
         log.warn("Invalid argument: {}", ex.getMessage());
         return ResponseEntity
                 .badRequest()
-                .body(JSendResponse.fail("INVALID_ENUM", ex.getMessage()));
+                .body(JSendResponse.fail("INVALID_VALUE", "Une valeur fournie n'est pas reconnue."));
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<JSendResponse<Map<String, String>>> handleMalformedJson(
             HttpMessageNotReadableException ex) {
+        if (hasCause(ex, PayloadTooLargeException.class)) {
+            log.warn("Rejected oversized request body");
+            return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                    .body(JSendResponse.fail("PAYLOAD_TOO_LARGE", "Le corps de la requête est trop volumineux."));
+        }
         log.warn("Malformed JSON request: {}", ex.getMessage());
         return ResponseEntity.badRequest()
                 .body(JSendResponse.fail("MALFORMED_JSON", "Le corps de la requête est invalide ou mal formé"));
@@ -136,5 +142,16 @@ public class GlobalExceptionHandler {
         return ResponseEntity
                 .internalServerError()
                 .body(JSendResponse.error("Une erreur inattendue est survenue"));
+    }
+
+    private boolean hasCause(Throwable throwable, Class<? extends Throwable> causeType) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (causeType.isInstance(current)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
     }
 }

@@ -8,6 +8,7 @@ import com.spoony.backend.domain.tasklog.model.TaskSnapshot;
 import com.spoony.backend.domain.tasklog.model.UserTaskLog;
 import com.spoony.backend.domain.tasklog.port.out.TaskLogPort;
 import com.spoony.backend.domain.shared.exception.NoActiveTasksException;
+import com.spoony.backend.domain.shared.exception.InvalidDateRangeException;
 import com.spoony.backend.domain.shared.exception.TaskLogExpiredException;
 import com.spoony.backend.domain.shared.exception.TaskLogNotFoundException;
 import com.spoony.backend.domain.shared.exception.TaskNotFoundException;
@@ -103,17 +104,29 @@ class TaskLogServiceTest {
     }
 
     @Test
-    void should_ReturnEmpty_When_FromAfterTo() {
+    void should_RejectRange_When_FromAfterTo() {
         // Arrange
         UUID userId = UUID.randomUUID();
         LocalDate from = LocalDate.of(2026, 4, 30);
         LocalDate to = LocalDate.of(2026, 4, 1);
 
         // Act
-        List<UserTaskLog> result = taskLogService.getLogsInRange(userId, from, to);
+        assertThatThrownBy(() -> taskLogService.getLogsInRange(userId, from, to))
+                .isInstanceOf(InvalidDateRangeException.class);
 
         // Assert
-        assertThat(result).isEmpty();
+        verify(taskLogPort, never()).findByUserIdAndDateBetween(any(), any(), any());
+    }
+
+    @Test
+    void should_RejectRange_When_MoreThan366Days() {
+        UUID userId = UUID.randomUUID();
+        LocalDate from = LocalDate.of(2025, 1, 1);
+        LocalDate to = LocalDate.of(2026, 1, 2);
+
+        assertThatThrownBy(() -> taskLogService.getLogsInRange(userId, from, to))
+                .isInstanceOf(InvalidDateRangeException.class);
+
         verify(taskLogPort, never()).findByUserIdAndDateBetween(any(), any(), any());
     }
 

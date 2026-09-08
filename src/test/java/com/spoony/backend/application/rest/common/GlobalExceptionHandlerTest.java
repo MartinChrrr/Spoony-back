@@ -210,4 +210,17 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().getStatus()).isEqualTo("error");
         assertThat(response.getBody().getMessage()).isEqualTo("Une erreur inattendue est survenue");
     }
+
+    @Test
+    void should_NotExposeTechnicalDetails_When_IllegalArgumentIsHandled() {
+        ResponseEntity<JSendResponse<Map<String, String>>> response =
+                handler.handleIllegalArgumentException(
+                        new IllegalArgumentException("No enum constant com.spoony.backend.Secret.INTERNAL"));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
+        assertThat(response.getBody().getData().get("code")).isEqualTo("INVALID_VALUE");
+        assertThat(response.getBody().getData().get("message"))
+                .isEqualTo("Une valeur fournie n'est pas reconnue.")
+                .doesNotContain("com.spoony");
+    }
 }

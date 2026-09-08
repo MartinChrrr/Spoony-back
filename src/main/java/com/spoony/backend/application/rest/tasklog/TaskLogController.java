@@ -5,6 +5,7 @@ import com.spoony.backend.application.tasklog.TaskLogApplicationService;
 import com.spoony.backend.domain.tasklog.model.BulkPostponeResult;
 import com.spoony.backend.domain.tasklog.model.TaskLogStatus;
 import com.spoony.backend.domain.tasklog.model.UserTaskLog;
+import com.spoony.backend.domain.shared.exception.InvalidDateRangeException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -51,6 +52,9 @@ public class TaskLogController {
             @RequestParam(name = "from", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
             @RequestParam(name = "to", required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
         UUID userId = getCurrentUserId();
+        if ((from == null) != (to == null)) {
+            throw new InvalidDateRangeException();
+        }
         List<UserTaskLog> domainLogs = (from != null && to != null)
                 ? taskLogApplicationService.getLogsInRange(userId, from, to)
                 : taskLogApplicationService.getTodayLogs(userId, includeArchived);

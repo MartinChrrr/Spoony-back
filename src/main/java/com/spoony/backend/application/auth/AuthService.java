@@ -16,6 +16,7 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
+import java.util.Locale;
 import java.util.UUID;
 
 @Service
@@ -37,14 +38,15 @@ public class AuthService {
 
     @Transactional
     public AuthResponse register(RegisterRequest request) {
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
+        String normalizedEmail = normalizeEmail(request.getEmail());
+        if (userRepository.findByEmail(normalizedEmail).isPresent()) {
             throw new EmailAlreadyExistsException();
         }
 
         UserEntity user = new UserEntity(
-                request.getEmail(),
+                normalizedEmail,
                 passwordEncoder.encode(request.getPassword()),
-                request.getFirstName()
+                request.getFirstName().trim()
         );
         // P0/RGPD Art. 9: explicit consent timestamp for health-data processing,
         // captured at account creation. @AssertTrue on the request already guarantees
@@ -59,7 +61,7 @@ public class AuthService {
 
     @Transactional
     public AuthResponse login(LoginRequest request) {
-        UserEntity user = userRepository.findByEmail(request.getEmail())
+        UserEntity user = userRepository.findByEmail(normalizeEmail(request.getEmail()))
                 .orElseThrow(InvalidCredentialsException::new);
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPasswordHash())) {
@@ -137,5 +139,9 @@ public class AuthService {
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 algorithm not available", e);
         }
+    }
+
+    private String normalizeEmail(String email) {
+        return email.trim().toLowerCase(Locale.ROOT);
     }
 }

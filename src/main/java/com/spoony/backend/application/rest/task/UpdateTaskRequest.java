@@ -5,6 +5,8 @@ import com.spoony.backend.domain.task.model.UserTask;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 import java.time.LocalDate;
 
@@ -12,6 +14,8 @@ import java.time.LocalDate;
 public class UpdateTaskRequest {
 
     @Schema(description = "Nouveau nom de la tâche", example = "Faire les courses bio")
+    @Size(max = 255, message = "Le nom de la tâche ne doit pas dépasser 255 caractères")
+    @Pattern(regexp = "(?s).*\\S.*", message = "Le nom de la tâche ne peut pas être vide")
     private String name;
 
     @Schema(description = "Nouveau coût en cuillères", example = "2", minimum = "1", maximum = "5")
@@ -20,15 +24,18 @@ public class UpdateTaskRequest {
     private Integer spoonCost;
 
     @Schema(description = "Nouveau niveau d'importance", example = "HIGH", allowableValues = {"LOW", "MEDIUM", "HIGH"})
+    @Pattern(regexp = "LOW|MEDIUM|HIGH", message = "Le niveau d'importance doit être LOW, MEDIUM ou HIGH")
     private String importance;
 
-    @Schema(description = "Nouvelle catégorie", example = "household")
+    @Schema(description = "Nouvelle catégorie", example = "household", maxLength = 50)
+    @Size(max = 50, message = "La catégorie ne doit pas dépasser 50 caractères")
     private String category;
 
     @Schema(description = "Nouvelle date d'échéance", example = "2026-04-06")
     private LocalDate dueDate;
 
-    @Schema(description = "Nouvelles notes", example = "Ajouter des fruits")
+    @Schema(description = "Nouvelles notes", example = "Ajouter des fruits", maxLength = 4000)
+    @Size(max = 4000, message = "Les notes ne doivent pas dépasser 4000 caractères")
     private String notes;
 
     public UpdateTaskRequest() {

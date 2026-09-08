@@ -9,6 +9,7 @@ import com.spoony.backend.domain.tasklog.model.UserTaskLog;
 import com.spoony.backend.domain.tasklog.port.in.TaskLogUseCase;
 import com.spoony.backend.domain.tasklog.port.out.TaskLogPort;
 import com.spoony.backend.domain.shared.exception.EnergyNotDeclaredException;
+import com.spoony.backend.domain.shared.exception.InvalidDateRangeException;
 import com.spoony.backend.domain.shared.exception.NoActiveTasksException;
 import com.spoony.backend.domain.shared.exception.TaskLogExpiredException;
 import com.spoony.backend.domain.shared.exception.TaskLogNotFoundException;
@@ -27,6 +28,7 @@ import java.util.UUID;
 public class TaskLogService implements TaskLogUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(TaskLogService.class);
+    private static final int MAX_HISTORY_RANGE_DAYS = 366;
 
     private final TaskLogPort taskLogPort;
     private final EnergyPort energyPort;
@@ -54,8 +56,10 @@ public class TaskLogService implements TaskLogUseCase {
     public List<UserTaskLog> getLogsInRange(UUID userId, LocalDate from, LocalDate to) {
         // Calendar history: return every log in the visible range (no 24h-archive
         // filtering — past completed tasks must remain visible).
-        if (from.isAfter(to)) {
-            return List.of();
+        if (from == null || to == null
+                || from.isAfter(to)
+                || from.plusDays(MAX_HISTORY_RANGE_DAYS - 1L).isBefore(to)) {
+            throw new InvalidDateRangeException();
         }
         return taskLogPort.findByUserIdAndDateBetween(userId, from, to);
     }

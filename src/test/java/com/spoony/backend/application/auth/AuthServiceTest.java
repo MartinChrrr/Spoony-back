@@ -67,6 +67,23 @@ class AuthServiceTest {
     }
 
     @Test
+    void should_NormalizeEmailAndFirstName_When_Registering() {
+        RegisterRequest request = new RegisterRequest("  Martin@Example.COM ", "password123", " Martin ");
+        when(userRepository.findByEmail("martin@example.com")).thenReturn(Optional.empty());
+        when(passwordEncoder.encode("password123")).thenReturn("$2a$10$hashedPassword");
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(jwtTokenProvider.generateAccessToken(any(UUID.class))).thenReturn("access-token");
+        when(jwtTokenProvider.generateRefreshToken(any(UUID.class))).thenReturn("refresh-token");
+
+        authService.register(request);
+
+        ArgumentCaptor<UserEntity> userCaptor = ArgumentCaptor.forClass(UserEntity.class);
+        verify(userRepository, times(2)).save(userCaptor.capture());
+        assertThat(userCaptor.getAllValues().get(0).getEmail()).isEqualTo("martin@example.com");
+        assertThat(userCaptor.getAllValues().get(0).getFirstName()).isEqualTo("Martin");
+    }
+
+    @Test
     void should_PersistConsentGivenAt_When_Registering() {
         // Arrange
         RegisterRequest request = new RegisterRequest("test@example.com", "password123", "Martin", true);
@@ -142,6 +159,22 @@ class AuthServiceTest {
         // Assert
         assertThat(response.getAccessToken()).isEqualTo("access-token");
         assertThat(response.getRefreshToken()).isEqualTo("refresh-token");
+    }
+
+    @Test
+    void should_NormalizeEmail_When_LoggingIn() {
+        LoginRequest request = new LoginRequest("  TEST@EXAMPLE.COM ", "password123");
+        UserEntity user = new UserEntity("test@example.com", "$2a$10$hashedPassword", "Martin");
+        when(userRepository.findByEmail("test@example.com")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("password123", "$2a$10$hashedPassword")).thenReturn(true);
+        when(userRepository.save(any(UserEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
+        when(jwtTokenProvider.generateAccessToken(any(UUID.class))).thenReturn("access-token");
+        when(jwtTokenProvider.generateRefreshToken(any(UUID.class))).thenReturn("refresh-token");
+
+        AuthResponse response = authService.login(request);
+
+        assertThat(response.getAccessToken()).isEqualTo("access-token");
+        verify(userRepository).findByEmail("test@example.com");
     }
 
     @Test
