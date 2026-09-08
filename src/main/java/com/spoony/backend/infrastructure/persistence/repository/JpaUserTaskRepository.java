@@ -23,5 +23,7 @@ public interface JpaUserTaskRepository extends JpaRepository<UserTaskEntity, UUI
 
     Optional<UserTaskEntity> findByIdAndUserId(UUID id, UUID userId);
 
+    Optional<UserTaskEntity> findByIdAndUserIdAndStatus(UUID id, UUID userId, TaskStatus status);
+
     boolean existsByIdAndUserId(UUID id, UUID userId);
 }

@@ -1,6 +1,7 @@
 package com.spoony.backend.domain.tasklog.port.out;
 
 import com.spoony.backend.domain.tasklog.model.TaskLogStatus;
+import com.spoony.backend.domain.tasklog.model.TaskSnapshot;
 import com.spoony.backend.domain.tasklog.model.UserTaskLog;
 
 import java.time.LocalDate;
@@ -22,18 +23,13 @@ public interface TaskLogPort {
 
     UserTaskLog save(UserTaskLog log);
 
+    UserTaskLog saveAndFlush(UserTaskLog log);
+
     List<UserTaskLog> saveAll(List<UserTaskLog> logs);
 
     /**
-     * Retourne le coût en cuillères de la tâche UNIQUEMENT si elle appartient à
-     * {@code userId}. Empêche l'IDOR : on ne révèle/comptabilise jamais le coût
-     * d'une tâche d'autrui. Optional.empty() = tâche inexistante OU pas la sienne.
+     * Returns immutable data to copy into a new log, only when the task belongs
+     * to the user and is still active. Empty also protects against ID enumeration.
      */
-    Optional<Integer> findSpoonCostByTaskIdAndUserId(UUID taskId, UUID userId);
-
-    /**
-     * Vrai si la tâche existe ET appartient à {@code userId}. Utilisé à la
-     * création de log pour vérifier la propriété avant d'insérer.
-     */
-    boolean existsTaskForUser(UUID taskId, UUID userId);
+    Optional<TaskSnapshot> findActiveTaskSnapshotForUser(UUID taskId, UUID userId);
 }

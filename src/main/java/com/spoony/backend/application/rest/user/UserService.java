@@ -81,6 +81,8 @@ public class UserService {
                 .map(l -> new UserExportResponse.ExportedTaskLog(
                         l.getId(),
                         l.getUserTaskId(),
+                        l.getTaskNameSnapshot(),
+                        l.getSpoonCostSnapshot(),
                         l.getDate(),
                         l.getStatus() != null ? l.getStatus().name() : null,
                         l.isSuggested(),

@@ -32,4 +32,9 @@ public class EnergyAdapter implements EnergyPort {
         DailyEnergyEntity saved = dailyEnergyRepository.save(entity);
         return EnergyMapper.toDomain(saved);
     }
+
+    @Override
+    public boolean adjustSpoonsUsed(UUID userId, LocalDate date, int delta) {
+        return dailyEnergyRepository.adjustSpoonsUsed(userId, date, delta) == 1;
+    }
 }

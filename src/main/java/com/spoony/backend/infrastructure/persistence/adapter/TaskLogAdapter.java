@@ -1,7 +1,9 @@
 package com.spoony.backend.infrastructure.persistence.adapter;
 
 import com.spoony.backend.domain.tasklog.model.TaskLogStatus;
+import com.spoony.backend.domain.tasklog.model.TaskSnapshot;
 import com.spoony.backend.domain.tasklog.model.UserTaskLog;
+import com.spoony.backend.domain.task.model.TaskStatus;
 import com.spoony.backend.domain.tasklog.port.out.TaskLogPort;
 import com.spoony.backend.infrastructure.persistence.entity.UserTaskLogEntity;
 import com.spoony.backend.infrastructure.persistence.mapper.TaskLogMapper;
@@ -72,6 +74,13 @@ public class TaskLogAdapter implements TaskLogPort {
     }
 
     @Override
+    public UserTaskLog saveAndFlush(UserTaskLog log) {
+        UserTaskLogEntity entity = TaskLogMapper.toEntity(log);
+        UserTaskLogEntity saved = taskLogRepository.saveAndFlush(entity);
+        return TaskLogMapper.toDomain(saved);
+    }
+
+    @Override
     public List<UserTaskLog> saveAll(List<UserTaskLog> logs) {
         List<UserTaskLogEntity> entities = logs.stream()
                 .map(TaskLogMapper::toEntity)
@@ -83,13 +92,8 @@ public class TaskLogAdapter implements TaskLogPort {
     }
 
     @Override
-    public Optional<Integer> findSpoonCostByTaskIdAndUserId(UUID taskId, UUID userId) {
-        return userTaskRepository.findByIdAndUserId(taskId, userId)
-                .map(entity -> (int) entity.getSpoonCost());
-    }
-
-    @Override
-    public boolean existsTaskForUser(UUID taskId, UUID userId) {
-        return userTaskRepository.existsByIdAndUserId(taskId, userId);
+    public Optional<TaskSnapshot> findActiveTaskSnapshotForUser(UUID taskId, UUID userId) {
+        return userTaskRepository.findByIdAndUserIdAndStatus(taskId, userId, TaskStatus.ACTIVE)
+                .map(entity -> new TaskSnapshot(entity.getName(), entity.getSpoonCost()));
     }
 }

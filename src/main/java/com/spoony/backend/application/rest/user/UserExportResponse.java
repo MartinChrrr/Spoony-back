@@ -254,6 +254,12 @@ public class UserExportResponse {
         @Schema(description = "Identifiant de la tâche utilisateur")
         private UUID userTaskId;
 
+        @Schema(description = "Nom historique de la tâche")
+        private String taskName;
+
+        @Schema(description = "Coût historique en cuillères")
+        private int spoonCost;
+
         @Schema(description = "Date du log")
         private LocalDate date;
 
@@ -274,6 +280,8 @@ public class UserExportResponse {
 
         public ExportedTaskLog(UUID id,
                                UUID userTaskId,
+                               String taskName,
+                               int spoonCost,
                                LocalDate date,
                                String status,
                                boolean suggested,
@@ -281,6 +289,8 @@ public class UserExportResponse {
                                LocalDateTime createdAt) {
             this.id = id;
             this.userTaskId = userTaskId;
+            this.taskName = taskName;
+            this.spoonCost = spoonCost;
             this.date = date;
             this.status = status;
             this.suggested = suggested;
@@ -302,6 +312,22 @@ public class UserExportResponse {
 
         public void setUserTaskId(UUID userTaskId) {
             this.userTaskId = userTaskId;
+        }
+
+        public String getTaskName() {
+            return taskName;
+        }
+
+        public void setTaskName(String taskName) {
+            this.taskName = taskName;
+        }
+
+        public int getSpoonCost() {
+            return spoonCost;
+        }
+
+        public void setSpoonCost(int spoonCost) {
+            this.spoonCost = spoonCost;
         }
 
         public LocalDate getDate() {

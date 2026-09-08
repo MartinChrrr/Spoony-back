@@ -104,13 +104,16 @@ public class TaskService implements TaskUseCase {
     }
 
     @Override
-    public void delete(UUID id, UUID userId) {
-        taskPort.findById(id)
+    public void archive(UUID id, UUID userId) {
+        UserTask existing = taskPort.findById(id)
                 .filter(t -> t.getUserId().equals(userId))
                 .orElseThrow(TaskNotFoundException::new);
 
-        taskPort.deleteById(id);
-        log.info("Task deleted userId={} taskId={}", userId, id);
+        if (existing.getStatus() != TaskStatus.ARCHIVED) {
+            existing.setStatus(TaskStatus.ARCHIVED);
+            taskPort.save(existing);
+        }
+        log.info("Task archived userId={} taskId={}", userId, id);
     }
 
     @Override

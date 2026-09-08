@@ -24,6 +24,9 @@ class TaskLogMapperTest {
         entity.setId(id);
         entity.setUserId(userId);
         entity.setUserTaskId(userTaskId);
+        entity.setTaskNameSnapshot("Historical task");
+        entity.setSpoonCostSnapshot((short) 4);
+        entity.setVersion(7);
         entity.setDate(LocalDate.of(2026, 3, 1));
         entity.setStatus(TaskLogStatus.COMPLETED);
         entity.setCompletedAt(now);
@@ -37,6 +40,9 @@ class TaskLogMapperTest {
         assertThat(log.getId()).isEqualTo(id);
         assertThat(log.getUserId()).isEqualTo(userId);
         assertThat(log.getUserTaskId()).isEqualTo(userTaskId);
+        assertThat(log.getTaskNameSnapshot()).isEqualTo("Historical task");
+        assertThat(log.getSpoonCostSnapshot()).isEqualTo(4);
+        assertThat(log.getVersion()).isEqualTo(7);
         assertThat(log.getDate()).isEqualTo(LocalDate.of(2026, 3, 1));
         assertThat(log.getStatus()).isEqualTo(TaskLogStatus.COMPLETED);
         assertThat(log.getCompletedAt()).isEqualTo(now);
@@ -55,6 +61,11 @@ class TaskLogMapperTest {
         log.setId(id);
         log.setUserId(userId);
         log.setUserTaskId(userTaskId);
+        log.setTaskNameSnapshot("Historical task");
+        log.setSpoonCostSnapshot(4);
+        log.setVersion(7);
+        log.setCreatedAt(now);
+        log.setUpdatedAt(now);
         log.setDate(LocalDate.of(2026, 3, 1));
         log.setStatus(TaskLogStatus.SKIPPED);
         log.setCompletedAt(now);
@@ -66,6 +77,11 @@ class TaskLogMapperTest {
         assertThat(entity.getId()).isEqualTo(id);
         assertThat(entity.getUserId()).isEqualTo(userId);
         assertThat(entity.getUserTaskId()).isEqualTo(userTaskId);
+        assertThat(entity.getTaskNameSnapshot()).isEqualTo("Historical task");
+        assertThat(entity.getSpoonCostSnapshot()).isEqualTo((short) 4);
+        assertThat(entity.getVersion()).isEqualTo(7);
+        assertThat(entity.getCreatedAt()).isEqualTo(now);
+        assertThat(entity.getUpdatedAt()).isEqualTo(now);
         assertThat(entity.getDate()).isEqualTo(LocalDate.of(2026, 3, 1));
         assertThat(entity.getStatus()).isEqualTo(TaskLogStatus.SKIPPED);
         assertThat(entity.getCompletedAt()).isEqualTo(now);

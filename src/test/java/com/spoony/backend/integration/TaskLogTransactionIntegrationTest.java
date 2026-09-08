@@ -8,6 +8,8 @@ import com.spoony.backend.infrastructure.persistence.entity.UserTaskLogEntity;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 
@@ -52,6 +54,54 @@ class TaskLogTransactionIntegrationTest extends IntegrationTestSupport {
 
         DailyEnergyEntity updated = dailyEnergyRepository.findById(energy.getId()).orElseThrow();
         assertThat(updated.getSpoonsUsed()).isEqualTo((short) 2);
+    }
+
+    @Test
+    void should_DecrementSnapshotCost_When_TaskCostChangedAfterCompletion() throws Exception {
+        UserEntity user = createUser();
+        UserTaskEntity task = createTask(user.getId(), "Original name", 3);
+        DailyEnergyEntity energy = createEnergy(user.getId(), 10, 0);
+        UserTaskLogEntity log = createLog(user.getId(), task.getId(), LocalDate.now(), TaskLogStatus.PLANNED);
+
+        mockMvc.perform(patch("/api/task-logs/" + log.getId() + "/status")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(user.getId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"COMPLETED\"}"))
+                .andExpect(status().isOk());
+
+        task.setName("Renamed");
+        task.setSpoonCost((short) 5);
+        userTaskRepository.saveAndFlush(task);
+
+        mockMvc.perform(patch("/api/task-logs/" + log.getId() + "/status")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(user.getId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"PLANNED\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.taskName").value("Original name"))
+                .andExpect(jsonPath("$.data.spoonCost").value(3));
+
+        DailyEnergyEntity updated = dailyEnergyRepository.findById(energy.getId()).orElseThrow();
+        assertThat(updated.getSpoonsUsed()).isZero();
+    }
+
+    @Test
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
+    void should_RollBackStatus_When_DecrementWouldMakeBalanceNegative() throws Exception {
+        UserEntity user = createUser();
+        UserTaskEntity task = createTask(user.getId(), "T", 3);
+        createEnergy(user.getId(), 10, 0);
+        UserTaskLogEntity log = createLog(user.getId(), task.getId(), LocalDate.now(), TaskLogStatus.COMPLETED);
+
+        mockMvc.perform(patch("/api/task-logs/" + log.getId() + "/status")
+                        .header(HttpHeaders.AUTHORIZATION, bearer(user.getId()))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"PLANNED\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.data.code").value("SPOON_BALANCE_CONFLICT"));
+
+        UserTaskLogEntity unchanged = userTaskLogRepository.findById(log.getId()).orElseThrow();
+        assertThat(unchanged.getStatus()).isEqualTo(TaskLogStatus.COMPLETED);
     }
 
     @Test

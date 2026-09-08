@@ -9,12 +9,15 @@ public class UserTaskLog {
     private UUID id;
     private UUID userId;
     private UUID userTaskId;
+    private String taskNameSnapshot;
+    private int spoonCostSnapshot;
     private LocalDate date;
     private TaskLogStatus status = TaskLogStatus.PLANNED;
     private boolean suggested = true;
     private LocalDateTime completedAt;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private long version;
 
     public UserTaskLog() {
     }
@@ -48,6 +51,22 @@ public class UserTaskLog {
 
     public void setUserTaskId(UUID userTaskId) {
         this.userTaskId = userTaskId;
+    }
+
+    public String getTaskNameSnapshot() {
+        return taskNameSnapshot;
+    }
+
+    public void setTaskNameSnapshot(String taskNameSnapshot) {
+        this.taskNameSnapshot = taskNameSnapshot;
+    }
+
+    public int getSpoonCostSnapshot() {
+        return spoonCostSnapshot;
+    }
+
+    public void setSpoonCostSnapshot(int spoonCostSnapshot) {
+        this.spoonCostSnapshot = spoonCostSnapshot;
     }
 
     public LocalDate getDate() {
@@ -96,5 +115,13 @@ public class UserTaskLog {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public long getVersion() {
+        return version;
+    }
+
+    public void setVersion(long version) {
+        this.version = version;
     }
 }

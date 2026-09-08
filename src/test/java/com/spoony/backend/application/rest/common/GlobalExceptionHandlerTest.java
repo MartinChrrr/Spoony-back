@@ -11,6 +11,7 @@ import com.spoony.backend.domain.shared.exception.TaskNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -176,6 +177,28 @@ class GlobalExceptionHandlerTest {
 
         assertThat(response.getStatusCode().value()).isEqualTo(409);
         assertThat(response.getBody().getData().get("code")).isEqualTo("DUPLICATE_RESOURCE");
+    }
+
+    @Test
+    void should_ReturnSpoonConflict_When_NonNegativeConstraintFails() {
+        DataIntegrityViolationException ex = new DataIntegrityViolationException(
+                "could not execute statement",
+                new RuntimeException("violates check constraint ck_daily_energy_spoons_used_non_negative"));
+
+        ResponseEntity<JSendResponse<Map<String, String>>> response =
+                handler.handleDataIntegrityViolation(ex);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(409);
+        assertThat(response.getBody().getData().get("code")).isEqualTo("SPOON_BALANCE_CONFLICT");
+    }
+
+    @Test
+    void should_Return409_When_ConcurrentModificationDetected() {
+        ResponseEntity<JSendResponse<Map<String, String>>> response =
+                handler.handleOptimisticLockingFailure(new OptimisticLockingFailureException("stale"));
+
+        assertThat(response.getStatusCode().value()).isEqualTo(409);
+        assertThat(response.getBody().getData().get("code")).isEqualTo("CONCURRENT_MODIFICATION");
     }
 
     @Test

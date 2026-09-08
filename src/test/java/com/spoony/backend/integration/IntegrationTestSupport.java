@@ -87,7 +87,10 @@ abstract class IntegrationTestSupport {
     }
 
     protected UserTaskLogEntity createLog(UUID userId, UUID taskId, LocalDate date, TaskLogStatus status) {
+        UserTaskEntity task = userTaskRepository.findByIdAndUserId(taskId, userId).orElseThrow();
         UserTaskLogEntity log = new UserTaskLogEntity(userId, taskId, date);
+        log.setTaskNameSnapshot(task.getName());
+        log.setSpoonCostSnapshot(task.getSpoonCost());
         log.setStatus(status);
         log.setSuggested(true);
         if (status == TaskLogStatus.COMPLETED) {

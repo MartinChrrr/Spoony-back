@@ -1,10 +1,10 @@
 package com.spoony.backend.domain.tasklog.service;
 
-import com.spoony.backend.domain.energy.model.DailyEnergy;
 import com.spoony.backend.domain.energy.port.out.EnergyPort;
 import com.spoony.backend.domain.shared.port.out.TaskPostponePort;
 import com.spoony.backend.domain.tasklog.model.BulkPostponeResult;
 import com.spoony.backend.domain.tasklog.model.TaskLogStatus;
+import com.spoony.backend.domain.tasklog.model.TaskSnapshot;
 import com.spoony.backend.domain.tasklog.model.UserTaskLog;
 import com.spoony.backend.domain.tasklog.port.in.TaskLogUseCase;
 import com.spoony.backend.domain.tasklog.port.out.TaskLogPort;
@@ -13,6 +13,7 @@ import com.spoony.backend.domain.shared.exception.NoActiveTasksException;
 import com.spoony.backend.domain.shared.exception.TaskLogExpiredException;
 import com.spoony.backend.domain.shared.exception.TaskLogNotFoundException;
 import com.spoony.backend.domain.shared.exception.TaskNotFoundException;
+import com.spoony.backend.domain.shared.exception.SpoonBalanceConflictException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -64,14 +65,15 @@ public class TaskLogService implements TaskLogUseCase {
             // Anti-IDOR : on refuse de créer un log pour une tâche qui n'appartient
             // pas au user. TaskNotFoundException (404) plutôt que Forbidden pour ne
             // pas révéler l'existence d'une tâche d'autrui (énumération d'IDs).
-            if (!taskLogPort.existsTaskForUser(taskId, userId)) {
-                throw new TaskNotFoundException();
-            }
+            TaskSnapshot snapshot = taskLogPort.findActiveTaskSnapshotForUser(taskId, userId)
+                    .orElseThrow(TaskNotFoundException::new);
 
             UserTaskLog taskLog = new UserTaskLog();
             taskLog.setId(UUID.randomUUID());
             taskLog.setUserId(userId);
             taskLog.setUserTaskId(taskId);
+            taskLog.setTaskNameSnapshot(snapshot.name());
+            taskLog.setSpoonCostSnapshot(snapshot.spoonCost());
             taskLog.setDate(today);
             taskLog.setStatus(TaskLogStatus.PLANNED);
             taskLog.setSuggested(true);
@@ -88,14 +90,15 @@ public class TaskLogService implements TaskLogUseCase {
         LocalDate today = LocalDate.now();
 
         // Anti-IDOR : un user ne peut logguer que ses propres tâches.
-        if (!taskLogPort.existsTaskForUser(userTaskId, userId)) {
-            throw new TaskNotFoundException();
-        }
+        TaskSnapshot snapshot = taskLogPort.findActiveTaskSnapshotForUser(userTaskId, userId)
+                .orElseThrow(TaskNotFoundException::new);
 
         UserTaskLog taskLog = new UserTaskLog();
         taskLog.setId(UUID.randomUUID());
         taskLog.setUserId(userId);
         taskLog.setUserTaskId(userTaskId);
+        taskLog.setTaskNameSnapshot(snapshot.name());
+        taskLog.setSpoonCostSnapshot(snapshot.spoonCost());
         taskLog.setDate(today);
         taskLog.setStatus(TaskLogStatus.PLANNED);
         taskLog.setSuggested(false);
@@ -136,22 +139,26 @@ public class TaskLogService implements TaskLogUseCase {
             taskLog.setCompletedAt(null);
         }
 
-        // Update spoonsUsed in energy. On filtre par userId : défense en
-        // profondeur, on ne comptabilise jamais le coût d'une tâche d'autrui.
-        int spoonCost = taskLogPort.findSpoonCostByTaskIdAndUserId(taskLog.getUserTaskId(), userId)
-                .orElseThrow(TaskNotFoundException::new);
-        DailyEnergy energy = energyPort.findByUserIdAndDate(userId, taskLog.getDate())
-                .orElseThrow(EnergyNotDeclaredException::new);
-
+        int delta = 0;
         if (newStatus == TaskLogStatus.COMPLETED) {
-            energy.setSpoonsUsed(energy.getSpoonsUsed() + spoonCost);
+            delta += taskLog.getSpoonCostSnapshot();
         }
         if (oldStatus == TaskLogStatus.COMPLETED) {
-            energy.setSpoonsUsed(energy.getSpoonsUsed() - spoonCost);
+            delta -= taskLog.getSpoonCostSnapshot();
         }
-        energyPort.save(energy);
 
-        UserTaskLog saved = taskLogPort.save(taskLog);
+        // Flush the versioned log first. A concurrent transition of this same log
+        // fails here, before any spoon delta is applied. The surrounding transaction
+        // also rolls this write back if the energy update fails afterwards.
+        UserTaskLog saved = taskLogPort.saveAndFlush(taskLog);
+
+        if (delta != 0 && !energyPort.adjustSpoonsUsed(userId, taskLog.getDate(), delta)) {
+            if (energyPort.findByUserIdAndDate(userId, taskLog.getDate()).isEmpty()) {
+                throw new EnergyNotDeclaredException();
+            }
+            throw new SpoonBalanceConflictException();
+        }
+
         log.info("Task log status updated logId={} oldStatus={} newStatus={} userId={}", logId, oldStatus, newStatus, userId);
         return saved;
     }

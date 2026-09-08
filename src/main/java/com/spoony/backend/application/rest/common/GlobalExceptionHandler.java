@@ -4,6 +4,7 @@ import com.spoony.backend.domain.shared.exception.BusinessException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
@@ -110,11 +111,23 @@ public class GlobalExceptionHandler {
                 || (hint.contains("user_id") && hint.contains("date"))) {
             code = "ENERGY_ALREADY_DECLARED";
             message = "L'énergie a déjà été déclarée pour cette date.";
+        } else if (hint.contains("ck_daily_energy_spoons_used_non_negative")) {
+            code = "SPOON_BALANCE_CONFLICT";
+            message = "Le compteur de cuillères ne peut pas devenir négatif.";
         }
 
         log.warn("Data integrity violation: code={} cause={}", code, cause);
         return ResponseEntity.status(HttpStatus.CONFLICT)
                 .body(JSendResponse.fail(code, message));
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<JSendResponse<Map<String, String>>> handleOptimisticLockingFailure(
+            OptimisticLockingFailureException ex) {
+        log.warn("Concurrent task log modification: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(JSendResponse.fail("CONCURRENT_MODIFICATION",
+                        "Ce suivi a été modifié sur un autre appareil. Rechargez les données puis réessayez."));
     }
 
     @ExceptionHandler(Exception.class)

@@ -102,12 +102,12 @@ public class TaskController {
     }
 
     @DeleteMapping("/{id}")
-    @Operation(summary = "Supprimer une tâche", description = "Supprime une tâche de l'utilisateur")
-    @ApiResponse(responseCode = "204", description = "Tâche supprimée")
+    @Operation(summary = "Archiver une tâche", description = "Archive la tâche sans supprimer son historique")
+    @ApiResponse(responseCode = "204", description = "Tâche archivée")
     @ApiResponse(responseCode = "404", description = "Tâche non trouvée")
     public ResponseEntity<Void> delete(@PathVariable UUID id) {
         UUID userId = getCurrentUserId();
-        taskUseCase.delete(id, userId);
+        taskUseCase.archive(id, userId);
         return ResponseEntity.noContent().build();
     }
 

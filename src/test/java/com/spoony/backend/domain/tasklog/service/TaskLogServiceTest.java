@@ -1,10 +1,10 @@
 package com.spoony.backend.domain.tasklog.service;
 
-import com.spoony.backend.domain.energy.model.DailyEnergy;
 import com.spoony.backend.domain.energy.port.out.EnergyPort;
 import com.spoony.backend.domain.shared.port.out.TaskPostponePort;
 import com.spoony.backend.domain.tasklog.model.BulkPostponeResult;
 import com.spoony.backend.domain.tasklog.model.TaskLogStatus;
+import com.spoony.backend.domain.tasklog.model.TaskSnapshot;
 import com.spoony.backend.domain.tasklog.model.UserTaskLog;
 import com.spoony.backend.domain.tasklog.port.out.TaskLogPort;
 import com.spoony.backend.domain.shared.exception.NoActiveTasksException;
@@ -124,8 +124,10 @@ class TaskLogServiceTest {
         UUID userId = UUID.randomUUID();
         UUID taskId1 = UUID.randomUUID();
         UUID taskId2 = UUID.randomUUID();
-        when(taskLogPort.existsTaskForUser(taskId1, userId)).thenReturn(true);
-        when(taskLogPort.existsTaskForUser(taskId2, userId)).thenReturn(true);
+        when(taskLogPort.findActiveTaskSnapshotForUser(taskId1, userId))
+                .thenReturn(Optional.of(new TaskSnapshot("Task 1", 2)));
+        when(taskLogPort.findActiveTaskSnapshotForUser(taskId2, userId))
+                .thenReturn(Optional.of(new TaskSnapshot("Task 2", 4)));
         when(taskLogPort.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
@@ -138,7 +140,9 @@ class TaskLogServiceTest {
             assertThat(log.getStatus()).isEqualTo(TaskLogStatus.PLANNED);
             assertThat(log.getDate()).isEqualTo(LocalDate.now());
             assertThat(log.getId()).isNotNull();
+            assertThat(log.getTaskNameSnapshot()).isNotBlank();
         });
+        assertThat(result).extracting(UserTaskLog::getSpoonCostSnapshot).containsExactly(2, 4);
     }
 
     @Test
@@ -146,7 +150,8 @@ class TaskLogServiceTest {
         // Arrange
         UUID userId = UUID.randomUUID();
         UUID taskId = UUID.randomUUID();
-        when(taskLogPort.existsTaskForUser(taskId, userId)).thenReturn(true);
+        when(taskLogPort.findActiveTaskSnapshotForUser(taskId, userId))
+                .thenReturn(Optional.of(new TaskSnapshot("Task", 2)));
         when(taskLogPort.saveAll(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
@@ -163,7 +168,8 @@ class TaskLogServiceTest {
         // Arrange
         UUID userId = UUID.randomUUID();
         UUID taskId = UUID.randomUUID();
-        when(taskLogPort.existsTaskForUser(taskId, userId)).thenReturn(true);
+        when(taskLogPort.findActiveTaskSnapshotForUser(taskId, userId))
+                .thenReturn(Optional.of(new TaskSnapshot("Historical name", 3)));
         when(taskLogPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
@@ -174,6 +180,8 @@ class TaskLogServiceTest {
         assertThat(result.getUserTaskId()).isEqualTo(taskId);
         assertThat(result.getStatus()).isEqualTo(TaskLogStatus.PLANNED);
         assertThat(result.getDate()).isEqualTo(LocalDate.now());
+        assertThat(result.getTaskNameSnapshot()).isEqualTo("Historical name");
+        assertThat(result.getSpoonCostSnapshot()).isEqualTo(3);
     }
 
     @Test
@@ -181,7 +189,8 @@ class TaskLogServiceTest {
         // Arrange
         UUID userId = UUID.randomUUID();
         UUID taskId = UUID.randomUUID();
-        when(taskLogPort.existsTaskForUser(taskId, userId)).thenReturn(true);
+        when(taskLogPort.findActiveTaskSnapshotForUser(taskId, userId))
+                .thenReturn(Optional.of(new TaskSnapshot("Task", 2)));
         when(taskLogPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
 
         // Act
@@ -196,7 +205,7 @@ class TaskLogServiceTest {
         // Arrange — IDOR : la tâche n'appartient pas au user → rejet, aucune insertion.
         UUID userId = UUID.randomUUID();
         UUID otherUsersTaskId = UUID.randomUUID();
-        when(taskLogPort.existsTaskForUser(otherUsersTaskId, userId)).thenReturn(false);
+        when(taskLogPort.findActiveTaskSnapshotForUser(otherUsersTaskId, userId)).thenReturn(Optional.empty());
 
         // Act & Assert
         assertThatThrownBy(() -> taskLogService.createManualLog(otherUsersTaskId, userId))
@@ -210,8 +219,9 @@ class TaskLogServiceTest {
         UUID userId = UUID.randomUUID();
         UUID ownTaskId = UUID.randomUUID();
         UUID otherUsersTaskId = UUID.randomUUID();
-        when(taskLogPort.existsTaskForUser(ownTaskId, userId)).thenReturn(true);
-        when(taskLogPort.existsTaskForUser(otherUsersTaskId, userId)).thenReturn(false);
+        when(taskLogPort.findActiveTaskSnapshotForUser(ownTaskId, userId))
+                .thenReturn(Optional.of(new TaskSnapshot("Own task", 2)));
+        when(taskLogPort.findActiveTaskSnapshotForUser(otherUsersTaskId, userId)).thenReturn(Optional.empty());
 
         // Act & Assert
         assertThatThrownBy(() -> taskLogService.createLogs(List.of(ownTaskId, otherUsersTaskId), userId))
@@ -230,22 +240,18 @@ class TaskLogServiceTest {
         log.setId(logId);
         log.setStatus(TaskLogStatus.PLANNED);
         log.setDate(LocalDate.now());
-
-        DailyEnergy energy = createEnergy(userId, 8, 2);
+        log.setSpoonCostSnapshot(3);
 
         when(taskLogPort.findById(logId)).thenReturn(Optional.of(log));
-        when(taskLogPort.findSpoonCostByTaskIdAndUserId(log.getUserTaskId(), userId)).thenReturn(Optional.of(3));
-        when(energyPort.findByUserIdAndDate(userId, LocalDate.now())).thenReturn(Optional.of(energy));
-        when(taskLogPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(energyPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(taskLogPort.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(energyPort.adjustSpoonsUsed(userId, LocalDate.now(), 3)).thenReturn(true);
 
         // Act
         UserTaskLog result = taskLogService.updateStatus(logId, TaskLogStatus.COMPLETED, userId);
 
         // Assert
         assertThat(result.getStatus()).isEqualTo(TaskLogStatus.COMPLETED);
-        assertThat(energy.getSpoonsUsed()).isEqualTo(5); // 2 + 3
-        verify(energyPort).save(energy);
+        verify(energyPort).adjustSpoonsUsed(userId, LocalDate.now(), 3);
     }
 
     @Test
@@ -258,22 +264,18 @@ class TaskLogServiceTest {
         log.setStatus(TaskLogStatus.COMPLETED);
         log.setCompletedAt(LocalDateTime.now());
         log.setDate(LocalDate.now());
-
-        DailyEnergy energy = createEnergy(userId, 8, 5);
+        log.setSpoonCostSnapshot(3);
 
         when(taskLogPort.findById(logId)).thenReturn(Optional.of(log));
-        when(taskLogPort.findSpoonCostByTaskIdAndUserId(log.getUserTaskId(), userId)).thenReturn(Optional.of(3));
-        when(energyPort.findByUserIdAndDate(userId, LocalDate.now())).thenReturn(Optional.of(energy));
-        when(taskLogPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(energyPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(taskLogPort.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(energyPort.adjustSpoonsUsed(userId, LocalDate.now(), -3)).thenReturn(true);
 
         // Act
         UserTaskLog result = taskLogService.updateStatus(logId, TaskLogStatus.SKIPPED, userId);
 
         // Assert
         assertThat(result.getStatus()).isEqualTo(TaskLogStatus.SKIPPED);
-        assertThat(energy.getSpoonsUsed()).isEqualTo(2); // 5 - 3
-        verify(energyPort).save(energy);
+        verify(energyPort).adjustSpoonsUsed(userId, LocalDate.now(), -3);
     }
 
     @Test
@@ -286,13 +288,9 @@ class TaskLogServiceTest {
         log.setStatus(TaskLogStatus.PLANNED);
         log.setDate(LocalDate.now());
 
-        DailyEnergy energy = createEnergy(userId, 8, 0);
-
         when(taskLogPort.findById(logId)).thenReturn(Optional.of(log));
-        when(taskLogPort.findSpoonCostByTaskIdAndUserId(log.getUserTaskId(), userId)).thenReturn(Optional.of(2));
-        when(energyPort.findByUserIdAndDate(userId, LocalDate.now())).thenReturn(Optional.of(energy));
-        when(taskLogPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(energyPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(taskLogPort.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(energyPort.adjustSpoonsUsed(userId, LocalDate.now(), 2)).thenReturn(true);
 
         // Act
         UserTaskLog result = taskLogService.updateStatus(logId, TaskLogStatus.COMPLETED, userId);
@@ -312,13 +310,9 @@ class TaskLogServiceTest {
         log.setCompletedAt(LocalDateTime.now());
         log.setDate(LocalDate.now());
 
-        DailyEnergy energy = createEnergy(userId, 8, 3);
-
         when(taskLogPort.findById(logId)).thenReturn(Optional.of(log));
-        when(taskLogPort.findSpoonCostByTaskIdAndUserId(log.getUserTaskId(), userId)).thenReturn(Optional.of(2));
-        when(energyPort.findByUserIdAndDate(userId, LocalDate.now())).thenReturn(Optional.of(energy));
-        when(taskLogPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(energyPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(taskLogPort.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(energyPort.adjustSpoonsUsed(userId, LocalDate.now(), -2)).thenReturn(true);
 
         // Act
         UserTaskLog result = taskLogService.updateStatus(logId, TaskLogStatus.PLANNED, userId);
@@ -381,13 +375,9 @@ class TaskLogServiceTest {
         log.setStatus(TaskLogStatus.PLANNED);
         log.setDate(LocalDate.now().minusDays(1)); // J-1 = OK
 
-        DailyEnergy energy = createEnergy(userId, 8, 0);
-
         when(taskLogPort.findById(logId)).thenReturn(Optional.of(log));
-        when(taskLogPort.findSpoonCostByTaskIdAndUserId(log.getUserTaskId(), userId)).thenReturn(Optional.of(2));
-        when(energyPort.findByUserIdAndDate(userId, log.getDate())).thenReturn(Optional.of(energy));
-        when(taskLogPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
-        when(energyPort.save(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(taskLogPort.saveAndFlush(any())).thenAnswer(invocation -> invocation.getArgument(0));
+        when(energyPort.adjustSpoonsUsed(userId, log.getDate(), 2)).thenReturn(true);
 
         // Act
         UserTaskLog result = taskLogService.updateStatus(logId, TaskLogStatus.COMPLETED, userId);
@@ -413,8 +403,8 @@ class TaskLogServiceTest {
 
         // Assert
         assertThat(result.getStatus()).isEqualTo(TaskLogStatus.PLANNED);
-        verify(taskLogPort, never()).save(any());
-        verify(energyPort, never()).save(any());
+        verify(taskLogPort, never()).saveAndFlush(any());
+        verify(energyPort, never()).adjustSpoonsUsed(any(), any(), anyInt());
     }
 
     // --- bulkPostpone ---
@@ -489,19 +479,12 @@ class TaskLogServiceTest {
         log.setId(UUID.randomUUID());
         log.setUserId(userId);
         log.setUserTaskId(UUID.randomUUID());
+        log.setTaskNameSnapshot("Task");
+        log.setSpoonCostSnapshot(2);
         log.setDate(LocalDate.now());
         log.setStatus(TaskLogStatus.PLANNED);
         log.setSuggested(true);
         return log;
     }
 
-    private DailyEnergy createEnergy(UUID userId, int spoons, int spoonsUsed) {
-        DailyEnergy energy = new DailyEnergy();
-        energy.setId(UUID.randomUUID());
-        energy.setUserId(userId);
-        energy.setDate(LocalDate.now());
-        energy.setSpoons(spoons);
-        energy.setSpoonsUsed(spoonsUsed);
-        return energy;
-    }
 }

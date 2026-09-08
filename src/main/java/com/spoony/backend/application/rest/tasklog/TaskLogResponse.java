@@ -16,6 +16,12 @@ public class TaskLogResponse {
     @Schema(description = "Identifiant de la tâche utilisateur", example = "550e8400-e29b-41d4-a716-446655440001")
     private UUID userTaskId;
 
+    @Schema(description = "Nom historique de la tâche", example = "Faire les courses")
+    private String taskName;
+
+    @Schema(description = "Coût historique du log en cuillères", example = "3")
+    private int spoonCost;
+
     @Schema(description = "Date du log", example = "2026-04-05")
     private LocalDate date;
 
@@ -41,6 +47,8 @@ public class TaskLogResponse {
         TaskLogResponse response = new TaskLogResponse();
         response.setId(log.getId());
         response.setUserTaskId(log.getUserTaskId());
+        response.setTaskName(log.getTaskNameSnapshot());
+        response.setSpoonCost(log.getSpoonCostSnapshot());
         response.setDate(log.getDate());
         response.setStatus(log.getStatus().name());
         response.setSuggested(log.isSuggested());
@@ -64,6 +72,22 @@ public class TaskLogResponse {
 
     public void setUserTaskId(UUID userTaskId) {
         this.userTaskId = userTaskId;
+    }
+
+    public String getTaskName() {
+        return taskName;
+    }
+
+    public void setTaskName(String taskName) {
+        this.taskName = taskName;
+    }
+
+    public int getSpoonCost() {
+        return spoonCost;
+    }
+
+    public void setSpoonCost(int spoonCost) {
+        this.spoonCost = spoonCost;
     }
 
     public LocalDate getDate() {

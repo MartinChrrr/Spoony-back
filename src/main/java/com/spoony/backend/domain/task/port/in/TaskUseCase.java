@@ -19,7 +19,7 @@ public interface TaskUseCase {
 
     UserTask update(UUID id, UserTask task, UUID userId);
 
-    void delete(UUID id, UUID userId);
+    void archive(UUID id, UUID userId);
 
     List<UserTask> createFromCatalog(List<TaskFromCatalogCommand> commands, UUID userId);
 }

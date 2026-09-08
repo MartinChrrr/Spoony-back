@@ -19,6 +19,4 @@ public interface TaskPort {
     UserTask save(UserTask task);
 
     List<UserTask> saveAll(List<UserTask> tasks);
-
-    void deleteById(UUID id);
 }

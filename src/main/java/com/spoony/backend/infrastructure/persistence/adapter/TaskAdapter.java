@@ -60,8 +60,4 @@ public class TaskAdapter implements TaskPort {
                 .toList();
     }
 
-    @Override
-    public void deleteById(UUID id) {
-        userTaskRepository.deleteById(id);
-    }
 }

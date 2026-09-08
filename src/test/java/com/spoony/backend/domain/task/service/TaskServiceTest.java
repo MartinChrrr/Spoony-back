@@ -229,7 +229,7 @@ class TaskServiceTest {
     }
 
     @Test
-    void should_DeleteTask_When_TaskExists() {
+    void should_ArchiveTask_When_TaskExists() {
         // Arrange
         UUID taskId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
@@ -239,28 +239,29 @@ class TaskServiceTest {
         when(taskPort.findById(taskId)).thenReturn(Optional.of(existing));
 
         // Act
-        taskService.delete(taskId, userId);
+        taskService.archive(taskId, userId);
 
         // Assert
-        verify(taskPort).deleteById(taskId);
+        assertThat(existing.getStatus()).isEqualTo(TaskStatus.ARCHIVED);
+        verify(taskPort).save(existing);
     }
 
     @Test
-    void should_ThrowTaskNotFound_When_DeleteNotExists() {
+    void should_ThrowTaskNotFound_When_ArchiveNotExists() {
         // Arrange
         UUID taskId = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         when(taskPort.findById(taskId)).thenReturn(Optional.empty());
 
         // Act & Assert
-        assertThatThrownBy(() -> taskService.delete(taskId, userId))
+        assertThatThrownBy(() -> taskService.archive(taskId, userId))
                 .isInstanceOf(TaskNotFoundException.class);
 
-        verify(taskPort, never()).deleteById(any());
+        verify(taskPort, never()).save(any());
     }
 
     @Test
-    void should_ThrowTaskNotFound_When_DeleteWrongUser() {
+    void should_ThrowTaskNotFound_When_ArchiveWrongUser() {
         // Arrange
         UUID taskId = UUID.randomUUID();
         UUID ownerId = UUID.randomUUID();
@@ -271,10 +272,10 @@ class TaskServiceTest {
         when(taskPort.findById(taskId)).thenReturn(Optional.of(existing));
 
         // Act & Assert
-        assertThatThrownBy(() -> taskService.delete(taskId, otherUserId))
+        assertThatThrownBy(() -> taskService.archive(taskId, otherUserId))
                 .isInstanceOf(TaskNotFoundException.class);
 
-        verify(taskPort, never()).deleteById(any());
+        verify(taskPort, never()).save(any());
     }
 
     private UserTask createTask(String name, int spoonCost, Importance importance) {
