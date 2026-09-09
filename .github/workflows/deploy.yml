@@ -1,7 +1,9 @@
 name: Deploy
 
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
     branches: [main]
   workflow_dispatch:
 
@@ -13,22 +15,28 @@ permissions:
 # Serialise deploys on the same ref (do not cancel a running deploy: an aborted
 # ECS rollout could leave the service half-updated).
 concurrency:
-  group: deploy-${{ github.ref }}
+  group: deploy-${{ github.event.workflow_run.head_branch || github.ref }}
   cancel-in-progress: false
 
 env:
   AWS_REGION: eu-west-3
   CONTAINER_NAME: app
+  SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
 
 jobs:
   deploy:
     name: Build, scan and deploy
+    if: >-
+      (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
+      (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
     runs-on: ubuntu-latest
     environment: production
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.SOURCE_SHA }}
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@v4
@@ -47,8 +55,8 @@ jobs:
           REGISTRY: ${{ steps.ecr-login.outputs.registry }}
           REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
         run: |
-          IMAGE_SHA="${REGISTRY}/${REPOSITORY}:${GITHUB_SHA}"
-          IMAGE_SHORT="${REGISTRY}/${REPOSITORY}:sha-${GITHUB_SHA::7}"
+          IMAGE_SHA="${REGISTRY}/${REPOSITORY}:${SOURCE_SHA}"
+          IMAGE_SHORT="${REGISTRY}/${REPOSITORY}:sha-${SOURCE_SHA::7}"
           docker build -t "$IMAGE_SHA" -t "$IMAGE_SHORT" .
           echo "IMAGE_SHA=$IMAGE_SHA" >> "$GITHUB_ENV"
           echo "IMAGE_SHORT=$IMAGE_SHORT" >> "$GITHUB_ENV"
@@ -72,6 +80,17 @@ jobs:
       # other field (env, secrets, roles) managed by Terraform.
       - name: Download current task definition
         run: |
+          PREVIOUS_TASK_DEFINITION="$(aws ecs describe-task-definition \
+            --task-definition "${{ secrets.ECS_TASK_FAMILY }}" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)"
+          echo "PREVIOUS_TASK_DEFINITION=$PREVIOUS_TASK_DEFINITION" >> "$GITHUB_ENV"
+          PREVIOUS_DESIRED_COUNT="$(aws ecs describe-services \
+            --cluster "${{ secrets.ECS_CLUSTER }}" \
+            --services "${{ secrets.ECS_SERVICE }}" \
+            --query 'services[0].desiredCount' \
+            --output text)"
+          echo "PREVIOUS_DESIRED_COUNT=$PREVIOUS_DESIRED_COUNT" >> "$GITHUB_ENV"
           aws ecs describe-task-definition \
             --task-definition "${{ secrets.ECS_TASK_FAMILY }}" \
             --query 'taskDefinition' \
@@ -86,9 +105,53 @@ jobs:
           image: ${{ env.IMAGE_SHA }}
 
       - name: Deploy to ECS
+        id: deploy
         uses: aws-actions/amazon-ecs-deploy-task-definition@v2
         with:
           task-definition: ${{ steps.render.outputs.task-definition }}
           service: ${{ secrets.ECS_SERVICE }}
           cluster: ${{ secrets.ECS_CLUSTER }}
           wait-for-service-stability: true
+
+      - name: Scale service after first real deployment
+        id: scale
+        env:
+          DESIRED_COUNT: ${{ vars.ECS_DESIRED_COUNT || '1' }}
+        run: |
+          aws ecs update-service \
+            --cluster "${{ secrets.ECS_CLUSTER }}" \
+            --service "${{ secrets.ECS_SERVICE }}" \
+            --desired-count "$DESIRED_COUNT" >/dev/null
+          aws ecs wait services-stable \
+            --cluster "${{ secrets.ECS_CLUSTER }}" \
+            --services "${{ secrets.ECS_SERVICE }}"
+
+      - name: HTTPS smoke test
+        id: smoke
+        env:
+          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+        run: |
+          test -n "$API_BASE_URL"
+          for attempt in $(seq 1 12); do
+            if curl --fail --silent --show-error \
+              "${API_BASE_URL%/}/actuator/health/readiness"; then
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1
+
+      - name: Roll back failed rollout
+        if: >-
+          failure() &&
+          (steps.deploy.outcome == 'success' || steps.deploy.outcome == 'failure')
+        run: |
+          aws ecs update-service \
+            --cluster "${{ secrets.ECS_CLUSTER }}" \
+            --service "${{ secrets.ECS_SERVICE }}" \
+            --task-definition "$PREVIOUS_TASK_DEFINITION" \
+            --desired-count "$PREVIOUS_DESIRED_COUNT" \
+            --force-new-deployment >/dev/null
+          aws ecs wait services-stable \
+            --cluster "${{ secrets.ECS_CLUSTER }}" \
+            --services "${{ secrets.ECS_SERVICE }}"

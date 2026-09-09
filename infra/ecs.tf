@@ -7,7 +7,7 @@ resource "aws_ecs_cluster" "main" {
 
   setting {
     name  = "containerInsights"
-    value = "disabled" # cost-optimised V0; enable for richer metrics later.
+    value = "enabled"
   }
 
   tags = {
@@ -125,6 +125,14 @@ resource "aws_ecs_service" "app" {
   # service; Terraform must not revert those out-of-band changes.
   lifecycle {
     ignore_changes = [task_definition, desired_count]
+
+    precondition {
+      condition = var.desired_count == 0 || (
+        var.container_image != "" &&
+        var.container_image != "public.ecr.aws/docker/library/busybox:latest"
+      )
+      error_message = "A running ECS service requires a real backend image; bootstrap with desired_count=0 first."
+    }
   }
 
   # A listener must exist before the service can attach to the target group.

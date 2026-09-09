@@ -22,6 +22,13 @@ resource "aws_lb" "main" {
   tags = {
     Name = "${local.name_prefix}-alb"
   }
+
+  lifecycle {
+    precondition {
+      condition     = var.environment != "prod" || local.https_enabled
+      error_message = "acm_certificate_arn is mandatory when environment=prod; production HTTP is forbidden."
+    }
+  }
 }
 
 resource "aws_lb_target_group" "app" {

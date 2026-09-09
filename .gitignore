@@ -46,4 +46,5 @@ crash.log
 crash.*.log
 # Real variable values (copied from terraform.tfvars.example).
 infra/terraform.tfvars
+infra/backend-prod.hcl
 # Keep the provider lock file (.terraform.lock.hcl) versioned.

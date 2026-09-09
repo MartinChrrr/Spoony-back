@@ -49,3 +49,68 @@ jobs:
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  postgres-integration:
+    name: PostgreSQL 16 integration tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: spoony_test
+          POSTGRES_USER: spoony_test
+          POSTGRES_PASSWORD: spoony_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U spoony_test -d spoony_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/spoony_test
+      SPRING_DATASOURCE_USERNAME: spoony_test
+      SPRING_DATASOURCE_PASSWORD: spoony_test
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_JPA_SHOW_SQL: 'false'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21 (Temurin)
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Run tests against PostgreSQL 16
+        run: ./mvnw verify -B
+
+  terraform:
+    name: Terraform format and validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.10.5'
+
+      - name: Check formatting
+        working-directory: infra
+        run: terraform fmt -check -recursive
+
+      - name: Initialise providers without the remote backend
+        working-directory: infra
+        run: terraform init -backend=false -input=false
+
+      - name: Validate configuration
+        working-directory: infra
+        run: terraform validate

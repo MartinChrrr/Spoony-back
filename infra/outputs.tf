@@ -62,3 +62,8 @@ output "rds_endpoint" {
   value       = aws_db_instance.main.endpoint
   sensitive   = true
 }
+
+output "alarm_topic_arn" {
+  description = "SNS topic receiving all production alarms."
+  value       = aws_sns_topic.alarms.arn
+}

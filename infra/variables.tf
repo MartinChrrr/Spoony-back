@@ -25,12 +25,9 @@ variable "vpc_cidr" {
 variable "container_image" {
   description = <<-EOT
     Full ECR image reference (repo:tag or repo@digest) deployed by the task
-    definition. The default is a tiny public placeholder so the very first
-    `terraform apply` can register the task definition (ECS rejects an empty
-    image). With the placeholder the service starts a task but stays UNHEALTHY
-    on /actuator/health (busybox does not listen on 8080) until the CD pipeline
-    pushes the first real image; Terraform then ignores task_definition changes
-    (see ecs.tf lifecycle), so the pipeline owns the image from then on.
+    definition. The placeholder may only be used while desired_count is zero.
+    Before starting the service, push a real immutable image to ECR and set its
+    full tag or digest here.
   EOT
   type        = string
   default     = "public.ecr.aws/docker/library/busybox:latest"
@@ -49,9 +46,14 @@ variable "container_memory" {
 }
 
 variable "desired_count" {
-  description = "Number of ECS tasks to run. Kept at 1 for a cost-optimised V0."
+  description = "Number of ECS tasks to run. Zero is the safe bootstrap default; use one only for a controlled beta."
   type        = number
-  default     = 1
+  default     = 0
+
+  validation {
+    condition     = var.desired_count >= 0
+    error_message = "desired_count must be zero or greater."
+  }
 }
 
 variable "db_instance_class" {
@@ -85,9 +87,8 @@ variable "cors_allowed_origins" {
 
 variable "acm_certificate_arn" {
   description = <<-EOT
-    ACM certificate ARN (in this region) for HTTPS. If empty, only an HTTP:80
-    listener is created (plain text, NOT acceptable for real prod). If set, an
-    HTTPS:443 listener is created and HTTP:80 redirects to it.
+    ACM certificate ARN (in this region) for HTTPS. It is mandatory when
+    environment is prod. Non-production environments may explicitly use HTTP.
   EOT
   type        = string
   default     = ""
@@ -103,6 +104,12 @@ variable "log_retention_days" {
   description = "CloudWatch Logs retention in days."
   type        = number
   default     = 30
+}
+
+variable "alarm_email" {
+  description = "Optional operational email subscribed to CloudWatch alarms. The AWS confirmation email must be accepted."
+  type        = string
+  default     = ""
 }
 
 variable "jwt_access_expiration" {

@@ -27,17 +27,18 @@ needs egress. This trades a little exposure surface for roughly **-32 €/mo**.
 ## Prerequisites
 
 - An AWS account with admin (or sufficient) rights to create VPC/IAM/ECS/RDS.
-- `terraform` >= 1.5
+- `terraform` >= 1.10
 - `aws-cli` v2, configured (`aws configure`) for **eu-west-3**.
 - `docker` (to build/push the first image, if not using the pipeline).
-- *(Optional, for HTTPS)* a domain and an **ACM certificate in eu-west-3**; pass
-  its ARN via `acm_certificate_arn`. Without it the ALB serves plain HTTP:80.
+- A domain and an **ACM certificate in eu-west-3** for production; Terraform
+  rejects `environment="prod"` when `acm_certificate_arn` is empty.
+- A versioned, encrypted, private S3 bucket for Terraform state.
 
 ## Files
 
 | File | Purpose |
 |------|---------|
-| `versions.tf` | Terraform/provider versions, backend (local by default, S3 commented). |
+| `versions.tf` | Terraform/provider versions and mandatory S3 backend with native lockfile. |
 | `variables.tf` | Inputs + `local.name_prefix = "${project_name}-${environment}"`. |
 | `terraform.tfvars.example` | Sample values — copy to `terraform.tfvars`. |
 | `network.tf` | VPC, IGW, 2 public + 2 private subnets, routes, 3 security groups. |
@@ -45,6 +46,7 @@ needs egress. This trades a little exposure surface for roughly **-32 €/mo**.
 | `secrets.tf` | Generated DB password + JWT secret in Secrets Manager. |
 | `rds.tf` | RDS PostgreSQL 16, encrypted, force-SSL parameter group. |
 | `logs.tf` | CloudWatch log group `/ecs/<prefix>`. |
+| `monitoring.tf` | SNS topic and core ALB/ECS/RDS/certificate alarms. |
 | `iam.tf` | ECS execution/task roles, GitHub OIDC provider + deploy role. |
 | `alb.tf` | ALB, target group, conditional HTTP/HTTPS listeners. |
 | `ecs.tf` | Cluster, task definition, service. |
@@ -56,13 +58,14 @@ needs egress. This trades a little exposure surface for roughly **-32 €/mo**.
 
 ```bash
 cd infra
-terraform init
+cp backend-prod.hcl.example backend-prod.hcl
+# edit backend-prod.hcl with the pre-created state bucket
+terraform init -backend-config=backend-prod.hcl
 ```
 
-This uses the **local** backend by default (state file on disk). To move to a
-shared S3 backend later, create the bucket + lock table, uncomment the `backend
-"s3"` block in `versions.tf`, then run `terraform init -migrate-state` (see the
-instructions in that file).
+The bucket bootstrap commands are in `DEPLOY.md`. State is encrypted and
+versioned in S3, with Terraform's native `use_lockfile` locking. Local state is
+not an accepted production mode.
 
 ### 2. Apply
 
@@ -72,12 +75,11 @@ cp terraform.tfvars.example terraform.tfvars
 terraform apply
 ```
 
-This creates the VPC, ECR, RDS, secrets, ALB and ECS service. The task
-definition is registered with a tiny **busybox placeholder** image (the default
-of `container_image`, since ECS rejects an empty image), so the service starts a
-task but it stays **UNHEALTHY** on `/actuator/health` until the CD pipeline
-pushes the first real image — that is expected. Terraform ignores later
-task-definition changes, so the pipeline owns the image from then on.
+This creates the VPC, ECR, RDS, secrets, ALB and ECS service. Keep
+`desired_count=0` for this bootstrap apply: the task definition may reference
+the placeholder, but no fake task is started. The first successful CD workflow
+deploys a real image before scaling the service. Terraform refuses a non-zero
+desired count with the placeholder image.
 
 Note the outputs:
 
@@ -125,7 +127,7 @@ NEW_TD=$(aws ecs register-task-definition --cli-input-json file:///tmp/td.json \
   --query 'taskDefinition.taskDefinitionArn' --output text)
 
 aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" \
-  --task-definition "$NEW_TD" --region "$REGION"
+  --task-definition "$NEW_TD" --desired-count 1 --region "$REGION"
 ```
 
 > In practice the simplest path is to set the GitHub secrets (step below) and
@@ -135,7 +137,7 @@ aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" \
 ### 4. Wait for stability
 
 ECS deploys the task; the ALB target becomes healthy once
-`/actuator/health` returns 200 (allow ~1–2 min for cold start + Flyway).
+`/actuator/health/readiness` returns 200 (allow ~1–2 min for cold start + Flyway).
 
 ```bash
 aws ecs wait services-stable \
@@ -148,9 +150,7 @@ aws ecs wait services-stable \
 
 ```bash
 ALB=$(terraform output -raw alb_dns_name)
-# HTTPS if acm_certificate_arn was set, else HTTP:
-curl -fsS "http://${ALB}/actuator/health"     # -> {"status":"UP"}
-# curl -fsS "https://<your-domain>/actuator/health"
+curl -fsS "https://<your-domain>/actuator/health/readiness"
 ```
 
 ## GitHub configuration (CD pipeline)
@@ -166,10 +166,12 @@ variables → Actions), all sourced from Terraform outputs:
 | `ECS_CLUSTER` | `terraform output -raw ecs_cluster_name` |
 | `ECS_SERVICE` | `terraform output -raw ecs_service_name` |
 | `ECS_TASK_FAMILY` | `terraform output -raw ecs_task_family` (e.g. `spoony-prod-app`) |
+| `API_BASE_URL` | Public HTTPS API origin used by the post-deploy smoke test |
 
-Also create a GitHub **Environment** named `production` (the workflow targets
-it, and the OIDC trust policy allows `environment:production`). The container
-name (`app`) and region (`eu-west-3`) are hard-coded as `env:` in the workflow.
+Also create a protected GitHub **Environment** named `production` (the workflow
+targets it, and the OIDC trust policy allows `environment:production`). The
+deploy starts automatically only after the complete CI workflow succeeds on
+`main`; its HTTPS smoke test triggers an ECS rollback on failure.
 
 > Run `terraform apply` **before** triggering the Deploy workflow: it creates the
 > ECS task-definition family that the workflow's `describe-task-definition` step
@@ -213,11 +215,9 @@ scheduled scale-to-zero could lower the V0 cost further.
   cost but no NAT.)
 - **High availability.** `multi_az = true` on RDS, `desired_count >= 2` and an
   Application Auto Scaling target tracking policy on the ECS service.
-- **Remote state / state secrets.** The Terraform state contains the generated
-  **DB password and JWT secret in clear text**. Keep `*.tfstate` out of git (see
-  the root `.gitignore`) and migrate to the **encrypted S3 backend** (SSE-KMS)
-  with DynamoDB locking and restricted access before more than one person
-  operates the stack.
+- **Remote state access.** Restrict the state bucket policy to the deployment
+  administrators and CI role; S3 encryption/versioning/lockfiles protect the
+  state, but authorized readers can still see generated secret values.
 - **Strict DB TLS.** `sslmode=require` encrypts the RDS connection but does not
   verify the server certificate. Move to `sslmode=verify-full` with the
   `rds-ca-rsa2048-g1` CA bundle post-V0. Acceptable for the V0.

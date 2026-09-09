@@ -14,17 +14,17 @@ environment  = "prod"
 vpc_cidr = "10.20.0.0/16"
 
 # Container image.
-# Keep the busybox placeholder for the very first `terraform apply` (ECS rejects
-# an empty image). The CD pipeline (or a manual `docker push`) then provides the
-# real image, and Terraform ignores task_definition changes afterwards. Example
-# once an image exists:
+# The bootstrap apply keeps desired_count at zero, so no placeholder task starts.
+# The first successful CD run replaces this image before scaling the service.
+# For subsequent Terraform applies, prefer a real immutable ECR image reference.
 # container_image = "123456789012.dkr.ecr.eu-west-3.amazonaws.com/spoony-backend:abc1234"
 container_image = "public.ecr.aws/docker/library/busybox:latest"
 
-# Task sizing (cost-optimised V0)
+# Task sizing. Zero is the safe bootstrap value; CD scales to ECS_DESIRED_COUNT
+# (one by default) only after deploying a real image.
 container_cpu    = 512
 container_memory = 1024
-desired_count    = 1
+desired_count    = 0
 
 # Database
 db_instance_class    = "db.t4g.micro"
@@ -39,13 +39,14 @@ cors_allowed_origins = "https://app.spoony.example,https://spoony.example"
 # JWT access token TTL in milliseconds (15 min default).
 jwt_access_expiration = "900000"
 
-# HTTPS (optional). Leave empty for HTTP-only (NOT for real prod).
-# Provide an ACM cert ARN *in eu-west-3* to enable the HTTPS:443 listener.
-# acm_certificate_arn = "arn:aws:acm:eu-west-3:123456789012:certificate/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
-acm_certificate_arn = ""
+# HTTPS is mandatory when environment="prod".
+acm_certificate_arn = "arn:aws:acm:eu-west-3:123456789012:certificate/xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
 
 # GitHub repo allowed to deploy via OIDC.
 github_repo = "MartinChrrr/Spoony-back"
 
 # Log retention
 log_retention_days = 30
+
+# Optional but strongly recommended. Confirm the subscription from the AWS email.
+alarm_email = "ops@example.com"

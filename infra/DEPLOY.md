@@ -27,24 +27,52 @@ docker --version
 jq --version
 ```
 
-Optionnel (pour le HTTPS) : un **domaine** et un **certificat ACM dans
-eu-west-3**. Sans certificat, l'ALB ne sert que du HTTP:80 (bootstrap seulement,
-**pas pour de vrais utilisateurs / données de santé**).
+Obligatoire pour `environment="prod"` : un **domaine** et un **certificat ACM
+dans eu-west-3**. Terraform refuse désormais de créer une production HTTP.
 
 ---
 
-## 1. Provisionner l'infrastructure
+## 1. Créer le backend Terraform sécurisé
+
+Le bucket de state doit exister avant la stack qu'il décrit. Choisir un nom
+globalement unique, puis activer chiffrement, versioning, blocage public et
+verrouillage natif S3 :
+
+```bash
+STATE_BUCKET="remplacer-par-un-nom-unique"
+aws s3api create-bucket \
+  --bucket "$STATE_BUCKET" \
+  --region eu-west-3 \
+  --create-bucket-configuration LocationConstraint=eu-west-3
+aws s3api put-bucket-encryption \
+  --bucket "$STATE_BUCKET" \
+  --server-side-encryption-configuration \
+  '{"Rules":[{"ApplyServerSideEncryptionByDefault":{"SSEAlgorithm":"AES256"}}]}'
+aws s3api put-bucket-versioning \
+  --bucket "$STATE_BUCKET" \
+  --versioning-configuration Status=Enabled
+aws s3api put-public-access-block \
+  --bucket "$STATE_BUCKET" \
+  --public-access-block-configuration \
+  BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
+```
+
+Copier `backend-prod.hcl.example` vers `backend-prod.hcl`, renseigner le bucket,
+puis initialiser avec `terraform init -backend-config=backend-prod.hcl`.
+
+## 2. Provisionner l'infrastructure sans démarrer le service
 
 ```bash
 cd infra
 
-terraform init                       # backend local par défaut
+terraform init -backend-config=backend-prod.hcl
 
 cp terraform.tfvars.example terraform.tfvars
 # Éditer terraform.tfvars :
 #   - cors_allowed_origins  (OBLIGATOIRE — origines de l'app, séparées par des virgules)
-#   - acm_certificate_arn   (optionnel — ARN du certificat pour activer le HTTPS)
-#   - laisser container_image sur le placeholder busybox pour ce 1er apply
+#   - acm_certificate_arn   (OBLIGATOIRE en production)
+#   - alarm_email           (recommandé, puis confirmer l'e-mail AWS)
+#   - laisser desired_count=0 pour ce premier apply sûr
 
 terraform plan                       # relire ce qui va être créé
 terraform apply                      # taper "yes"
@@ -52,8 +80,8 @@ terraform apply                      # taper "yes"
 
 Crée : VPC (sans NAT), RDS PostgreSQL chiffrée, ECR, Secrets Manager (mot de
 passe DB + JWT générés), CloudWatch, ALB, rôles IAM + OIDC GitHub, service ECS.
-Le service démarre avec l'image placeholder → **statut UNHEALTHY** jusqu'au
-premier vrai déploiement (étape 3). C'est attendu.
+Le service ECS existe mais reste à zéro tâche : aucun conteneur factice instable
+n'est démarré et le premier `apply` peut se terminer proprement.
 
 Récupérer les valeurs pour GitHub :
 
@@ -68,7 +96,7 @@ terraform output -raw ecs_task_family             # -> ECS_TASK_FAMILY
 
 ---
 
-## 2. Configurer le dépôt GitHub (CD)
+## 3. Configurer le dépôt GitHub (CD)
 
 Dans **Settings → Secrets and variables → Actions**, créer ces **secrets** :
 
@@ -79,72 +107,72 @@ Dans **Settings → Secrets and variables → Actions**, créer ces **secrets** 
 | `ECS_CLUSTER` | `terraform output -raw ecs_cluster_name` |
 | `ECS_SERVICE` | `terraform output -raw ecs_service_name` |
 | `ECS_TASK_FAMILY` | `terraform output -raw ecs_task_family` |
+| `API_BASE_URL` | URL HTTPS publique, ex. `https://api.spoony.martincharrier.dev` |
 
 Puis, dans **Settings → Environments**, créer un environnement nommé
 **`production`** (le workflow le cible, et la trust policy OIDC l'autorise).
+Ajouter si nécessaire la variable `ECS_DESIRED_COUNT` ; sa valeur par défaut est
+`1`, adaptée uniquement à une bêta contrôlée. L'abonnement SNS envoyé à
+`alarm_email` doit aussi être confirmé.
 
 > Lancer `terraform apply` **avant** de déclencher le workflow : il crée la
 > famille de task definition que le pipeline va lire.
 
 ---
 
-## 3. Premier déploiement (vraie image)
+## 4. Premier déploiement (vraie image)
 
-Le plus simple : déclencher le workflow **Deploy**.
+Le plus simple : pousser sur `main`. Le workflow **Deploy** ne démarre qu'après
+la réussite complète de **CI** (tests H2, PostgreSQL 16, image et Terraform),
+remplace l'image factice, scale ensuite le service, exécute un smoke test HTTPS
+et restaure la task definition précédente si le smoke test échoue.
 
 ```bash
 # soit en poussant sur main (déclenche le workflow)
 git push origin main
-# soit manuellement : onglet Actions → "Deploy" → "Run workflow"
+# soit manuellement sur main : onglet Actions → "Deploy" → "Run workflow"
 ```
 
 Le pipeline : OIDC → build de l'image → scan Trivy (bloque si CRITICAL/HIGH) →
-push ECR taggé par SHA → enregistre une révision de task def → met à jour le
-service et attend la stabilité.
+push ECR taggé par SHA → enregistre une révision de task def → met à jour et
+scale le service → attend la stabilité → smoke test HTTPS → rollback si besoin.
 
 *(Alternative 100 % manuelle : voir la section « Push a first image » du
 [`README.md`](./README.md).)*
 
 ---
 
-## 4. Vérifier
+## 5. Vérifier
 
 ```bash
 ALB=$(cd infra && terraform output -raw alb_dns_name)
 
-# HTTP (sans certificat ACM) :
-curl -fsS "http://${ALB}/actuator/health"      # -> {"status":"UP"}
-# HTTPS (avec certificat + domaine pointant sur l'ALB) :
-# curl -fsS "https://api.ton-domaine/actuator/health"
+curl -fsS "https://api.ton-domaine/actuator/health/readiness"
+curl -fsS "https://api.ton-domaine/actuator/health/liveness"
 ```
 
 Dans CloudWatch Logs (`/ecs/spoony-prod`), confirmer la ligne
-`The following profiles are active: prod` et que Flyway applique V1..V7.
+`The following profiles are active: prod` et que Flyway applique toutes les migrations.
 
 ---
 
-## 5. Coût (estimation mensuelle, eu-west-3)
+## 6. Coût (estimation mensuelle, eu-west-3)
 
 | Poste | ~ €/mois |
 |---|---:|
 | Fargate (0.5 vCPU / 1 Go, 1 tâche) | ~18 |
 | ALB | ~18 |
 | RDS db.t4g.micro (20 Go gp3) | ~13 |
-| Logs / Secrets / ECR + IPv4 publiques | ~4-8 |
+| Logs / métriques / alarmes / Secrets / ECR + IPv4 publiques | ~5-10 |
 | NAT gateway (aucun, par choix) | 0 |
-| **Total** | **~50-55** |
+| **Total** | **~51-57** |
 
 ---
 
-## 6. À faire après la V0 (non bloquant)
+## 7. Actions manuelles restantes
 
-- **HTTPS obligatoire** : fournir `acm_certificate_arn` + domaine (le HTTP:80
-  bootstrap ne doit pas servir de données de santé).
-- **State distant chiffré** : migrer vers le backend S3 (SSE-KMS) + lock
-  DynamoDB — le state contient le mot de passe DB et le JWT **en clair**.
 - **Utilisateur DB dédié** least-privilege (la V0 utilise le master RDS).
-- **Observabilité** : export métriques Micrometer → CloudWatch + alarmes (5xx,
-  latence, CPU), séparation liveness/readiness, sécurisation de `/actuator`.
+- **Reprise** : effectuer et consigner un test réel de restauration RDS.
 - **Haute dispo** : `desired_count >= 2`, autoscaling, RDS multi-AZ.
 
 Détails et justifications dans [`README.md`](./README.md).
