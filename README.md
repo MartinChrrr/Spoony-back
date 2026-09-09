@@ -2,12 +2,9 @@
 
 API REST pour l'application **Spoony**, une application de gestion de taches basee sur la **Theorie des Cuilleres** (*Spoon Theory*). Concue pour aider les personnes atteintes de maladies chroniques ou de handicaps a gerer leur energie quotidienne de maniere bienveillante.
 
-> ⚠️ **Important — branche de travail**
-> Le developpement actif se fait sur la branche **`dev`**. La branche `main` n'est pas a jour pour le moment.
-> **Travaillez et deployez depuis `dev`** :
-> ```bash
-> git checkout dev
-> ```
+> **Branches** : les changements sont integres sur `dev`, puis promus par pull
+> request vers `main`. Seul un commit de `main` dont la CI a reussi peut
+> declencher le deploiement de production.
 
 ## Stack technique
 
@@ -36,7 +33,7 @@ API REST pour l'application **Spoony**, une application de gestion de taches bas
 git clone git@github.com:MartinChrrr/Spoony-back.git
 cd spoony-backend
 
-# 2. Se placer sur la branche de developpement (IMPORTANT)
+# 2. Se placer sur la branche d'integration
 git checkout dev
 
 # 3. Lancer PostgreSQL et Adminer via Docker
@@ -143,6 +140,11 @@ src/main/java/com/spoony/backend/
 
 ## Endpoints API
 
+Le contrat mobile courant est versionne sous **`/api/v1`**. Les anciens chemins
+`/api/*` restent temporairement disponibles comme alias de compatibilite ; aucun
+nouveau client ne doit les utiliser. La specification OpenAPI est exposee sous
+`/api-docs` et annonce la version `v1`.
+
 Toutes les reponses suivent le format **JSend** :
 
 ```json
@@ -156,25 +158,28 @@ Toutes les reponses suivent le format **JSend** :
 
 | Methode | Endpoint | Description | Auth |
 |---------|----------|-------------|------|
-| `POST` | `/api/auth/register` | Inscription (email, password, firstName) | Non |
-| `POST` | `/api/auth/login` | Connexion, retourne les tokens JWT | Non |
-| `POST` | `/api/auth/refresh` | Rafraichir le token d'acces | Non |
+| `POST` | `/api/v1/auth/register` | Inscription (email, password, firstName, consentGiven) | Non |
+| `POST` | `/api/v1/auth/login` | Connexion, retourne les tokens JWT | Non |
+| `POST` | `/api/v1/auth/refresh` | Rafraichir le token d'acces | Non |
+| `POST` | `/api/v1/auth/logout` | Revoquer le refresh token | Oui |
 
 Les endpoints proteges necessitent le header : `Authorization: Bearer <token>`
 
-> **Rate limiting** : les routes `/api/auth/**` sont limitees a **10 requetes/minute
-> par IP**. Au-dela, l'API renvoie `429` avec le code `RATE_LIMITED`.
+> **Rate limiting local** : par minute, login accepte 50 tentatives par IP et 10
+> par email, register 20 par IP et 5 par email, refresh 120 par IP et 30 par
+> refresh token. Les cles sont hachees et les refus sont metriques. Ce garde-fou
+> est propre a chaque instance ; une production multi-instance doit le completer
+> par AWS WAF ou un stockage distribue.
 
 ### Taches
 
 | Methode | Endpoint | Description | Auth |
 |---------|----------|-------------|------|
-| `GET` | `/api/tasks` | Lister les taches actives | Oui |
-| `GET` | `/api/tasks/{id}` | Detail d'une tache | Oui |
-| `POST` | `/api/tasks` | Creer une tache (seul `name` est requis) | Oui |
-| `POST` | `/api/tasks/from-catalog` | Creer des taches depuis le catalogue de taches predefinies | Oui |
-| `PUT` | `/api/tasks/{id}` | Modifier une tache | Oui |
-| `DELETE` | `/api/tasks/{id}` | Supprimer une tache | Oui |
+| `GET` | `/api/v1/tasks` | Lister les taches actives | Oui |
+| `GET` | `/api/v1/tasks/{id}` | Detail d'une tache | Oui |
+| `POST` | `/api/v1/tasks` | Creer une tache (seul `name` est requis) | Oui |
+| `PUT` | `/api/v1/tasks/{id}` | Modifier une tache | Oui |
+| `DELETE` | `/api/v1/tasks/{id}` | Archiver une tache | Oui |
 
 > Creation rapide : seul le champ `name` est obligatoire. Valeurs par defaut : `spoonCost=2`, `importance=MEDIUM`, `dueDate=aujourd'hui`.
 
@@ -182,10 +187,9 @@ Les endpoints proteges necessitent le header : `Authorization: Bearer <token>`
 
 | Methode | Endpoint | Description | Auth |
 |---------|----------|-------------|------|
-| `GET` | `/api/energy/today` | Energie declaree aujourd'hui | Oui |
-| `POST` | `/api/energy` | Declarer l'energie du jour (0-12 cuilleres) | Oui |
-| `PUT` | `/api/energy/today` | Reevaluer les cuilleres en cours de journee | Oui |
-| `PATCH` | `/api/energy/today/mood` | Enregistrer l'humeur de fin de journee | Oui |
+| `GET` | `/api/v1/energy/today` | Energie declaree aujourd'hui | Oui |
+| `POST` | `/api/v1/energy` | Declarer l'energie du jour (0-12 cuilleres) | Oui |
+| `PUT` | `/api/v1/energy/today` | Reevaluer les cuilleres en cours de journee | Oui |
 
 > Si l'energie declaree est **0**, toutes les taches actives sont automatiquement reportees au lendemain.
 
@@ -193,36 +197,36 @@ Les endpoints proteges necessitent le header : `Authorization: Bearer <token>`
 
 | Methode | Endpoint | Description | Auth |
 |---------|----------|-------------|------|
-| `GET` | `/api/task-logs` | Logs du jour (`?include_archived=true` pour les archives, `?from=YYYY-MM-DD&to=YYYY-MM-DD` pour une plage / vue calendrier) | Oui |
-| `POST` | `/api/task-logs` | Creer des logs en masse (statut PLANNED) | Oui |
-| `POST` | `/api/task-logs/manual` | Creer un log manuel | Oui |
-| `PATCH` | `/api/task-logs/{id}/status` | Changer le statut d'un log | Oui |
-| `POST` | `/api/task-logs/bulk-postpone` | Reporter toutes les taches PLANNED | Oui |
+| `GET` | `/api/v1/task-logs` | Logs du jour (`?include_archived=true` pour les archives, `?from=YYYY-MM-DD&to=YYYY-MM-DD` pour une plage / vue calendrier) | Oui |
+| `POST` | `/api/v1/task-logs` | Creer des logs en masse (statut PLANNED) | Oui |
+| `POST` | `/api/v1/task-logs/manual` | Creer un log manuel | Oui |
+| `PATCH` | `/api/v1/task-logs/{id}/status` | Changer le statut d'un log | Oui |
+| `POST` | `/api/v1/task-logs/bulk-postpone` | Reporter toutes les taches PLANNED | Oui |
 
 ### Suggestions
 
 | Methode | Endpoint | Description | Auth |
 |---------|----------|-------------|------|
-| `GET` | `/api/suggestions` | Obtenir les suggestions du jour (classees par score) | Oui |
+| `GET` | `/api/v1/suggestions` | Obtenir les suggestions du jour (classees par score) | Oui |
 
 ### Taches predefinies (Catalogue)
 
 | Methode | Endpoint | Description | Auth |
 |---------|----------|-------------|------|
-| `GET` | `/api/base-tasks` | Lister le catalogue de taches predefinies (`?category=`, `?locale=`) | Oui |
+| `GET` | `/api/v1/base-tasks` | Lister le catalogue de taches predefinies (`?category=`, `?locale=`) | Oui |
 
 ### Messages bienveillants
 
 | Methode | Endpoint | Description | Auth |
 |---------|----------|-------------|------|
-| `GET` | `/api/messages/random` | Message aleatoire par contexte (`?context=`, `?locale=`) | Oui |
+| `GET` | `/api/v1/messages/random` | Message aleatoire par contexte (`?context=`, `?locale=`) | Oui |
 
 ### Utilisateurs
 
 | Methode | Endpoint | Description | Auth |
 |---------|----------|-------------|------|
-| `GET` | `/api/users/me/export` | Exporter toutes mes donnees personnelles (RGPD, Art. 15 & 20) | Oui |
-| `DELETE` | `/api/users/me` | Supprimer mon compte et toutes mes donnees (RGPD) | Oui |
+| `GET` | `/api/v1/users/me/export` | Exporter toutes mes donnees personnelles (RGPD, Art. 15 & 20) | Oui |
+| `DELETE` | `/api/v1/users/me` | Supprimer mon compte et toutes mes donnees (RGPD) | Oui |
 
 ## Base de donnees
 
@@ -248,14 +252,14 @@ connexion ou, a defaut, date de creation).
 ## Tests
 
 ```bash
-# Lancer tous les tests
-./mvnw test
-
-# Lancer les tests avec le rapport
-./mvnw test -Dmaven.test.failure.ignore=false
+# Lancer les tests, produire le rapport JaCoCo et verifier le seuil de couverture
+./mvnw verify
 ```
 
-Les tests utilisent une base **H2 en memoire**.
+La suite locale utilise **H2 en memoire**. La CI rejoue egalement toute la suite
+contre **PostgreSQL 16** afin de valider Flyway, les contraintes, la concurrence
+et les transactions sur le moteur cible. Le rapport local est genere dans
+`target/site/jacoco/` et le build exige au moins 70 % de lignes couvertes.
 
 ## Docker
 
