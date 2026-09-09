@@ -85,8 +85,8 @@ resource "aws_iam_role" "ecs_task" {
 # (c) GitHub OIDC provider + deploy role.
 # ---------------------------------------------------------------------------
 resource "aws_iam_openid_connect_provider" "github" {
-  url             = "https://token.actions.githubusercontent.com"
-  client_id_list  = ["sts.amazonaws.com"]
+  url            = "https://token.actions.githubusercontent.com"
+  client_id_list = ["sts.amazonaws.com"]
   # GitHub's OIDC certificate thumbprint (well-known value). AWS now validates the
   # token against its trusted-CA library, so this field is kept only because the
   # API still requires it; refresh it if GitHub ever rotates its CA.
@@ -185,8 +185,8 @@ data "aws_iam_policy_document" "github_deploy" {
   }
 
   statement {
-    sid    = "PassEcsRoles"
-    effect = "Allow"
+    sid     = "PassEcsRoles"
+    effect  = "Allow"
     actions = ["iam:PassRole"]
     resources = [
       aws_iam_role.ecs_execution.arn,

@@ -15,7 +15,6 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 @Configuration
 @EnableWebSecurity
@@ -39,23 +38,12 @@ public class SecurityConfig {
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(
-                                AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/api/auth/register"),
-                                AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/api/auth/login"),
-                                AntPathRequestMatcher.antMatcher(HttpMethod.POST, "/api/auth/refresh")
-                        ).permitAll()
-                        .requestMatchers(
-                                AntPathRequestMatcher.antMatcher("/actuator/health")
-                        ).permitAll()
-                        .requestMatchers(
-                                AntPathRequestMatcher.antMatcher("/swagger-ui/**"),
-                                AntPathRequestMatcher.antMatcher("/swagger-ui.html"),
-                                AntPathRequestMatcher.antMatcher("/api-docs/**"),
-                                AntPathRequestMatcher.antMatcher("/v3/api-docs/**")
-                        ).permitAll()
-                        .requestMatchers(
-                                AntPathRequestMatcher.antMatcher(HttpMethod.OPTIONS, "/**")
-                        ).permitAll()
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/auth/register", "/api/auth/login", "/api/auth/refresh").permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
+                        .requestMatchers("/swagger-ui/**", "/swagger-ui.html",
+                                "/api-docs/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(exceptions -> exceptions

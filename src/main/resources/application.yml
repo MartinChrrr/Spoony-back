@@ -21,7 +21,9 @@ management:
         include: health,info
   endpoint:
     health:
-      show-details: when-authorized
+      show-details: never
+      probes:
+        enabled: true
 
 app:
   # V0 is scoped to France: every server-side "today" uses this single IANA
@@ -29,6 +31,9 @@ app:
   business-time-zone: ${BUSINESS_TIME_ZONE:Europe/Paris}
   http:
     max-request-size-bytes: ${MAX_REQUEST_SIZE_BYTES:262144}
+  data-retention:
+    # Fail closed until the advance-notice email and grace-period workflow exist.
+    deletion-enabled: ${DATA_RETENTION_DELETION_ENABLED:false}
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000}
 

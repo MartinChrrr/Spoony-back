@@ -34,8 +34,10 @@ resource "aws_lb_target_group" "app" {
   deregistration_delay = 60
 
   health_check {
-    enabled             = true
-    path                = "/actuator/health"
+    enabled = true
+    # Readiness decides whether this task should receive traffic. A dependency
+    # outage may remove it from the ALB without forcing ECS to kill the JVM.
+    path                = "/actuator/health/readiness"
     protocol            = "HTTP"
     port                = "traffic-port"
     matcher             = "200"

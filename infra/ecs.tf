@@ -79,7 +79,9 @@ resource "aws_ecs_task_definition" "app" {
       }
 
       healthCheck = {
-        command     = ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health || exit 1"]
+        # Liveness only detects a wedged process. It deliberately does not depend
+        # on RDS, avoiding replacement loops during a database incident.
+        command     = ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health/liveness || exit 1"]
         interval    = 30
         timeout     = 5
         retries     = 3
