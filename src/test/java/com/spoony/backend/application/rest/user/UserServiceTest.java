@@ -16,6 +16,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Collections;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -26,6 +30,11 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
+
+    private static final Clock FIXED_CLOCK = Clock.fixed(
+            Instant.parse("2026-09-09T08:15:30Z"),
+            ZoneId.of("Europe/Paris")
+    );
 
     @Mock
     private JpaUserRepository userRepository;
@@ -43,7 +52,13 @@ class UserServiceTest {
 
     @BeforeEach
     void setUp() {
-        userService = new UserService(userRepository, userTaskRepository, userTaskLogRepository, dailyEnergyRepository);
+        userService = new UserService(
+                userRepository,
+                userTaskRepository,
+                userTaskLogRepository,
+                dailyEnergyRepository,
+                FIXED_CLOCK
+        );
     }
 
     @Test
@@ -71,6 +86,8 @@ class UserServiceTest {
         UUID userId = UUID.randomUUID();
         UserEntity user = new UserEntity("marie@example.com", "hash", "Marie");
         user.setId(userId);
+        user.setConsentVersion("health-data-v1");
+        user.setPrivacyPolicyVersion("2026-09-09");
 
         UserTaskEntity task = new UserTaskEntity();
         task.setId(UUID.randomUUID());
@@ -86,6 +103,10 @@ class UserServiceTest {
 
         assertThat(export.getProfile().getEmail()).isEqualTo("marie@example.com");
         assertThat(export.getProfile().getFirstName()).isEqualTo("Marie");
+        assertThat(export.getGeneratedAt())
+                .isEqualTo(OffsetDateTime.parse("2026-09-09T10:15:30+02:00"));
+        assertThat(export.getProfile().getConsentVersion()).isEqualTo("health-data-v1");
+        assertThat(export.getProfile().getPrivacyPolicyVersion()).isEqualTo("2026-09-09");
         assertThat(export.getTasks()).hasSize(1);
         assertThat(export.getTasks().get(0).getName()).isEqualTo("Courses");
         assertThat(export.getTaskLogs()).isEmpty();

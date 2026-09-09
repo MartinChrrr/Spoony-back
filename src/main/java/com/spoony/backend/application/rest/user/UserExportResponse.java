@@ -4,11 +4,15 @@ import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
 @Schema(description = "Export complet des données utilisateur (RGPD Art. 15/20)")
 public class UserExportResponse {
+
+    @Schema(description = "Date de génération de l'export, avec fuseau horaire")
+    private OffsetDateTime generatedAt;
 
     @Schema(description = "Profil utilisateur")
     private UserProfile profile;
@@ -25,14 +29,24 @@ public class UserExportResponse {
     public UserExportResponse() {
     }
 
-    public UserExportResponse(UserProfile profile,
+    public UserExportResponse(OffsetDateTime generatedAt,
+                              UserProfile profile,
                               List<ExportedTask> tasks,
                               List<ExportedTaskLog> taskLogs,
                               List<ExportedEnergy> energyDeclarations) {
+        this.generatedAt = generatedAt;
         this.profile = profile;
         this.tasks = tasks;
         this.taskLogs = taskLogs;
         this.energyDeclarations = energyDeclarations;
+    }
+
+    public OffsetDateTime getGeneratedAt() {
+        return generatedAt;
+    }
+
+    public void setGeneratedAt(OffsetDateTime generatedAt) {
+        this.generatedAt = generatedAt;
     }
 
     public UserProfile getProfile() {
@@ -81,13 +95,30 @@ public class UserExportResponse {
         @Schema(description = "Date de création du compte")
         private LocalDateTime createdAt;
 
+        @Schema(description = "Date du consentement explicite au traitement des données de santé")
+        private LocalDateTime consentGivenAt;
+
+        @Schema(description = "Version du texte de consentement accepté")
+        private String consentVersion;
+
+        @Schema(description = "Version de la politique de confidentialité acceptée")
+        private String privacyPolicyVersion;
+
         public UserProfile() {
         }
 
-        public UserProfile(String email, String firstName, LocalDateTime createdAt) {
+        public UserProfile(String email,
+                           String firstName,
+                           LocalDateTime createdAt,
+                           LocalDateTime consentGivenAt,
+                           String consentVersion,
+                           String privacyPolicyVersion) {
             this.email = email;
             this.firstName = firstName;
             this.createdAt = createdAt;
+            this.consentGivenAt = consentGivenAt;
+            this.consentVersion = consentVersion;
+            this.privacyPolicyVersion = privacyPolicyVersion;
         }
 
         public String getEmail() {
@@ -112,6 +143,30 @@ public class UserExportResponse {
 
         public void setCreatedAt(LocalDateTime createdAt) {
             this.createdAt = createdAt;
+        }
+
+        public LocalDateTime getConsentGivenAt() {
+            return consentGivenAt;
+        }
+
+        public void setConsentGivenAt(LocalDateTime consentGivenAt) {
+            this.consentGivenAt = consentGivenAt;
+        }
+
+        public String getConsentVersion() {
+            return consentVersion;
+        }
+
+        public void setConsentVersion(String consentVersion) {
+            this.consentVersion = consentVersion;
+        }
+
+        public String getPrivacyPolicyVersion() {
+            return privacyPolicyVersion;
+        }
+
+        public void setPrivacyPolicyVersion(String privacyPolicyVersion) {
+            this.privacyPolicyVersion = privacyPolicyVersion;
         }
     }
 

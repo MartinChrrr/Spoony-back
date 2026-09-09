@@ -13,7 +13,10 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -24,6 +27,11 @@ import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
+
+    private static final Clock FIXED_CLOCK = Clock.fixed(
+            Instant.parse("2026-09-09T08:15:30Z"),
+            ZoneId.of("Europe/Paris")
+    );
 
     @Mock
     private JpaUserRepository userRepository;
@@ -38,7 +46,14 @@ class AuthServiceTest {
 
     @BeforeEach
     void setUp() {
-        authService = new AuthService(userRepository, passwordEncoder, jwtTokenProvider);
+        authService = new AuthService(
+                userRepository,
+                passwordEncoder,
+                jwtTokenProvider,
+                FIXED_CLOCK,
+                "health-data-v1",
+                "2026-09-09"
+        );
     }
 
     @Test
@@ -93,8 +108,6 @@ class AuthServiceTest {
         when(jwtTokenProvider.generateAccessToken(any(UUID.class))).thenReturn("access-token");
         when(jwtTokenProvider.generateRefreshToken(any(UUID.class))).thenReturn("refresh-token");
 
-        LocalDateTime before = LocalDateTime.now();
-
         // Act
         authService.register(request);
 
@@ -103,8 +116,9 @@ class AuthServiceTest {
         verify(userRepository, times(2)).save(userCaptor.capture());
         UserEntity savedUser = userCaptor.getAllValues().get(0);
         assertThat(savedUser.getConsentGivenAt())
-                .isNotNull()
-                .isAfterOrEqualTo(before);
+                .isEqualTo(LocalDateTime.of(2026, 9, 9, 10, 15, 30));
+        assertThat(savedUser.getConsentVersion()).isEqualTo("health-data-v1");
+        assertThat(savedUser.getPrivacyPolicyVersion()).isEqualTo("2026-09-09");
     }
 
     @Test

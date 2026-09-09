@@ -28,6 +28,12 @@ public class UserEntity extends BaseEntity {
     @Column(name = "consent_given_at")
     private LocalDateTime consentGivenAt;
 
+    @Column(name = "consent_version", nullable = false, length = 64)
+    private String consentVersion = "legacy-unversioned";
+
+    @Column(name = "privacy_policy_version", nullable = false, length = 64)
+    private String privacyPolicyVersion = "legacy-unversioned";
+
     public UserEntity() {
     }
 
@@ -83,5 +89,21 @@ public class UserEntity extends BaseEntity {
 
     public void setConsentGivenAt(LocalDateTime consentGivenAt) {
         this.consentGivenAt = consentGivenAt;
+    }
+
+    public String getConsentVersion() {
+        return consentVersion;
+    }
+
+    public void setConsentVersion(String consentVersion) {
+        this.consentVersion = consentVersion;
+    }
+
+    public String getPrivacyPolicyVersion() {
+        return privacyPolicyVersion;
+    }
+
+    public void setPrivacyPolicyVersion(String privacyPolicyVersion) {
+        this.privacyPolicyVersion = privacyPolicyVersion;
     }
 }

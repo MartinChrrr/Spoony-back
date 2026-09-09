@@ -14,6 +14,8 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -26,15 +28,18 @@ public class UserService {
     private final JpaUserTaskRepository userTaskRepository;
     private final JpaUserTaskLogRepository userTaskLogRepository;
     private final JpaDailyEnergyRepository dailyEnergyRepository;
+    private final Clock clock;
 
     public UserService(JpaUserRepository userRepository,
                        JpaUserTaskRepository userTaskRepository,
                        JpaUserTaskLogRepository userTaskLogRepository,
-                       JpaDailyEnergyRepository dailyEnergyRepository) {
+                       JpaDailyEnergyRepository dailyEnergyRepository,
+                       Clock businessClock) {
         this.userRepository = userRepository;
         this.userTaskRepository = userTaskRepository;
         this.userTaskLogRepository = userTaskLogRepository;
         this.dailyEnergyRepository = dailyEnergyRepository;
+        this.clock = businessClock;
     }
 
     @Transactional
@@ -60,7 +65,10 @@ public class UserService {
         UserExportResponse.UserProfile profile = new UserExportResponse.UserProfile(
                 user.getEmail(),
                 user.getFirstName(),
-                user.getCreatedAt()
+                user.getCreatedAt(),
+                user.getConsentGivenAt(),
+                user.getConsentVersion(),
+                user.getPrivacyPolicyVersion()
         );
 
         List<UserExportResponse.ExportedTask> exportedTasks = tasks.stream()
@@ -105,6 +113,12 @@ public class UserService {
 
         log.info("RGPD export: données exportées pour userId={}", userId);
 
-        return new UserExportResponse(profile, exportedTasks, exportedLogs, exportedEnergy);
+        return new UserExportResponse(
+                OffsetDateTime.now(clock),
+                profile,
+                exportedTasks,
+                exportedLogs,
+                exportedEnergy
+        );
     }
 }

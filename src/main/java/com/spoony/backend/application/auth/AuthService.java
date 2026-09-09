@@ -7,6 +7,7 @@ import com.spoony.backend.infrastructure.persistence.repository.JpaUserRepositor
 import com.spoony.backend.infrastructure.security.JwtTokenProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.time.Clock;
 import java.time.LocalDateTime;
 import java.util.HexFormat;
 import java.util.Locale;
@@ -27,13 +29,22 @@ public class AuthService {
     private final JpaUserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final Clock clock;
+    private final String consentVersion;
+    private final String privacyPolicyVersion;
 
     public AuthService(JpaUserRepository userRepository,
                        PasswordEncoder passwordEncoder,
-                       JwtTokenProvider jwtTokenProvider) {
+                       JwtTokenProvider jwtTokenProvider,
+                       Clock businessClock,
+                       @Value("${app.privacy.consent-version:health-data-v1}") String consentVersion,
+                       @Value("${app.privacy.policy-version:2026-09-09}") String privacyPolicyVersion) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
+        this.clock = businessClock;
+        this.consentVersion = consentVersion;
+        this.privacyPolicyVersion = privacyPolicyVersion;
     }
 
     @Transactional
@@ -51,7 +62,9 @@ public class AuthService {
         // P0/RGPD Art. 9: explicit consent timestamp for health-data processing,
         // captured at account creation. @AssertTrue on the request already guarantees
         // consentGiven == true reached this point.
-        user.setConsentGivenAt(LocalDateTime.now());
+        user.setConsentGivenAt(LocalDateTime.now(clock));
+        user.setConsentVersion(consentVersion);
+        user.setPrivacyPolicyVersion(privacyPolicyVersion);
 
         userRepository.save(user);
         log.info("User registered userId={}", user.getId());
@@ -68,7 +81,7 @@ public class AuthService {
             throw new InvalidCredentialsException();
         }
 
-        user.setLastLoginAt(LocalDateTime.now());
+        user.setLastLoginAt(LocalDateTime.now(clock));
         userRepository.save(user);
 
         log.info("User logged in userId={}", user.getId());
@@ -103,7 +116,7 @@ public class AuthService {
         // P0/ADR-015: a token refresh is real activity. Without this, a user who stays
         // logged in (only ever refreshing, never re-logging in) keeps a stale lastLoginAt
         // and gets purged as "inactive" by the retention scheduler despite daily use.
-        user.setLastLoginAt(LocalDateTime.now());
+        user.setLastLoginAt(LocalDateTime.now(clock));
 
         log.info("Token refreshed userId={}", userId);
 
