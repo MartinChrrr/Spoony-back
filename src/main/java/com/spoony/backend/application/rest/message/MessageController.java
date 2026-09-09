@@ -18,7 +18,7 @@ import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 
 @RestController
-@RequestMapping(value = "/api/messages", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequestMapping(value = {"/api/v1/messages", "/api/messages"}, produces = MediaType.APPLICATION_JSON_VALUE)
 @Tag(name = "Messages", description = "Messages bienveillants contextuels")
 public class MessageController {
 

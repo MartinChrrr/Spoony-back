@@ -19,7 +19,7 @@ public class SwaggerConfig {
                 .info(new Info()
                         .title("Spoony API")
                         .description("Backend API pour Spoony — gestion du quotidien basée sur la théorie des cuillères")
-                        .version("1.0.0"))
+                        .version("v1"))
                 .addSecurityItem(new SecurityRequirement().addList(schemeName))
                 .components(new Components()
                         .addSecuritySchemes(schemeName, new SecurityScheme()

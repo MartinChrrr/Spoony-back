@@ -25,7 +25,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping(value = "/api/tasks", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequestMapping(value = {"/api/v1/tasks", "/api/tasks"}, produces = MediaType.APPLICATION_JSON_VALUE)
 @Tag(name = "Tasks", description = "Gestion des tâches utilisateur")
 public class TaskController {
 

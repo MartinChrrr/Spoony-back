@@ -30,7 +30,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping(value = "/api/task-logs", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequestMapping(value = {"/api/v1/task-logs", "/api/task-logs"}, produces = MediaType.APPLICATION_JSON_VALUE)
 @Tag(name = "TaskLogs", description = "Gestion des logs de tâches quotidiens")
 public class TaskLogController {
 

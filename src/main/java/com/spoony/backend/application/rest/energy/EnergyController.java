@@ -21,7 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.UUID;
 
 @RestController
-@RequestMapping(value = "/api/energy", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequestMapping(value = {"/api/v1/energy", "/api/energy"}, produces = MediaType.APPLICATION_JSON_VALUE)
 @Tag(name = "Energy", description = "Gestion de l'énergie quotidienne (cuillères)")
 public class EnergyController {
 

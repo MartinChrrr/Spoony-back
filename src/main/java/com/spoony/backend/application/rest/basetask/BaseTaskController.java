@@ -16,7 +16,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 
 @RestController
-@RequestMapping(value = "/api/base-tasks", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequestMapping(value = {"/api/v1/base-tasks", "/api/base-tasks"}, produces = MediaType.APPLICATION_JSON_VALUE)
 @Tag(name = "BaseTasks", description = "Catalogue de tâches prédéfinies")
 public class BaseTaskController {
 

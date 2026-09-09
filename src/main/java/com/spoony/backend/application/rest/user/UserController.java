@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.UUID;
 
 @RestController
-@RequestMapping(value = "/api/users", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequestMapping(value = {"/api/v1/users", "/api/users"}, produces = MediaType.APPLICATION_JSON_VALUE)
 @Tag(name = "Users", description = "Gestion du compte utilisateur (RGPD)")
 public class UserController {
 

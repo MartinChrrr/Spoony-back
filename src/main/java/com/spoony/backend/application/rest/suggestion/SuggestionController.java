@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.UUID;
 
 @RestController
-@RequestMapping(value = "/api/suggestions", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequestMapping(value = {"/api/v1/suggestions", "/api/suggestions"}, produces = MediaType.APPLICATION_JSON_VALUE)
 @Tag(name = "Suggestions", description = "Suggestions de tâches basées sur l'énergie et la priorité")
 public class SuggestionController {
 

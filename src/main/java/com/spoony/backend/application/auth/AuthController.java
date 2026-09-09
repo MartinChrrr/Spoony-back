@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.UUID;
 
 @RestController
-@RequestMapping(value = "/api/auth", produces = MediaType.APPLICATION_JSON_VALUE)
+@RequestMapping(value = {"/api/v1/auth", "/api/auth"}, produces = MediaType.APPLICATION_JSON_VALUE)
 @Tag(name = "Auth", description = "Authentification : inscription, connexion, refresh token")
 public class AuthController {
 
