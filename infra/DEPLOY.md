@@ -12,12 +12,12 @@ l'architecture détaillée, les coûts et la dette post-V0.
 ## 0. Prérequis (à installer une fois)
 
 ```bash
-# Terraform >= 1.5
+# Terraform >= 1.10 (verrouillage natif S3 via use_lockfile)
 terraform -version
 
-# AWS CLI v2 + identifiants (clé IAM avec droits admin ou équivalents)
+# AWS CLI v2 + session temporaire (éviter les clés IAM longue durée)
 aws --version
-aws configure          # région: eu-west-3, format: json
+aws login              # ouvre le navigateur et crée une session temporaire
 aws sts get-caller-identity   # doit afficher ton compte
 
 # Docker (pour la 1re image si tu ne passes pas par le pipeline)
@@ -69,17 +69,20 @@ terraform init -backend-config=backend-prod.hcl
 
 cp terraform.tfvars.example terraform.tfvars
 # Éditer terraform.tfvars :
+#   - aws_account_id       (OBLIGATOIRE — valeur retournée par STS)
 #   - cors_allowed_origins  (OBLIGATOIRE — origines de l'app, séparées par des virgules)
 #   - acm_certificate_arn   (OBLIGATOIRE en production)
 #   - alarm_email           (recommandé, puis confirmer l'e-mail AWS)
 #   - laisser desired_count=0 pour ce premier apply sûr
+#   - si un provider OIDC GitHub existe déjà dans le compte, renseigner son ARN
 
 terraform plan                       # relire ce qui va être créé
 terraform apply                      # taper "yes"
 ```
 
-Crée : VPC (sans NAT), RDS PostgreSQL chiffrée, ECR, Secrets Manager (mot de
-passe DB + JWT générés), CloudWatch, ALB, rôles IAM + OIDC GitHub, service ECS.
+Crée : VPC (sans NAT), RDS PostgreSQL chiffrée, ECR, Secrets Manager (mots de
+passe DB administrateur/migration/runtime + JWT générés), CloudWatch, ALB,
+rôles IAM + OIDC GitHub, service ECS.
 Le service ECS existe mais reste à zéro tâche : aucun conteneur factice instable
 n'est démarré et le premier `apply` peut se terminer proprement.
 
@@ -92,6 +95,7 @@ terraform output -raw ecr_repository_name         # -> ECR_REPOSITORY
 terraform output -raw ecs_cluster_name            # -> ECS_CLUSTER
 terraform output -raw ecs_service_name            # -> ECS_SERVICE
 terraform output -raw ecs_task_family             # -> ECS_TASK_FAMILY
+terraform output -raw ecs_migration_task_family   # -> ECS_MIGRATION_TASK_FAMILY
 ```
 
 ---
@@ -107,6 +111,7 @@ Dans **Settings → Secrets and variables → Actions**, créer ces **secrets** 
 | `ECS_CLUSTER` | `terraform output -raw ecs_cluster_name` |
 | `ECS_SERVICE` | `terraform output -raw ecs_service_name` |
 | `ECS_TASK_FAMILY` | `terraform output -raw ecs_task_family` |
+| `ECS_MIGRATION_TASK_FAMILY` | `terraform output -raw ecs_migration_task_family` |
 | `API_BASE_URL` | URL HTTPS publique, ex. `https://api.spoony.martincharrier.dev` |
 
 Puis, dans **Settings → Environments**, créer un environnement nommé
@@ -134,11 +139,16 @@ git push origin main
 ```
 
 Le pipeline : OIDC → build de l'image → scan Trivy (bloque si CRITICAL/HIGH) →
-push ECR taggé par SHA → enregistre une révision de task def → met à jour et
-scale le service → attend la stabilité → smoke test HTTPS → rollback si besoin.
+push ECR taggé par SHA → exécute la tâche ponctuelle de bootstrap/migration DB →
+enregistre une révision de task def web → met à jour et scale le service →
+attend la stabilité → smoke test HTTPS → rollback applicatif si besoin.
 
-*(Alternative 100 % manuelle : voir la section « Push a first image » du
-[`README.md`](./README.md).)*
+> Une migration de base n'est pas annulée par le rollback ECS. Toute migration
+> doit donc rester compatible avec la version applicative précédente selon une
+> stratégie expand/contract.
+
+Le chemin de production supporté est ce workflow complet. Un simple push manuel
+de l'image contournerait la tâche de migration et ne doit pas démarrer le service.
 
 ---
 
@@ -151,8 +161,9 @@ curl -fsS "https://api.ton-domaine/actuator/health/readiness"
 curl -fsS "https://api.ton-domaine/actuator/health/liveness"
 ```
 
-Dans CloudWatch Logs (`/ecs/spoony-prod`), confirmer la ligne
-`The following profiles are active: prod` et que Flyway applique toutes les migrations.
+Dans CloudWatch Logs (`/ecs/spoony-prod`), confirmer dans le flux `migration`
+que Flyway applique/valide toutes les migrations et termine avec succès, puis
+dans le flux `app` que le profil `prod` est actif et que le service devient prêt.
 
 ---
 
@@ -171,7 +182,6 @@ Dans CloudWatch Logs (`/ecs/spoony-prod`), confirmer la ligne
 
 ## 7. Actions manuelles restantes
 
-- **Utilisateur DB dédié** least-privilege (la V0 utilise le master RDS).
 - **Reprise** : effectuer et consigner un test réel de restauration RDS.
 - **Haute dispo** : `desired_count >= 2`, autoscaling, RDS multi-AZ.
 

@@ -6,6 +6,9 @@
 # AWS region (Paris). All health data stays in the EU.
 region = "eu-west-3"
 
+# Safety guard: Terraform refuses to touch another account.
+aws_account_id = "123456789012"
+
 # Naming
 project_name = "spoony"
 environment  = "prod"
@@ -31,6 +34,8 @@ db_instance_class    = "db.t4g.micro"
 db_allocated_storage = 20
 db_name              = "spoony"
 db_username          = "spoony"
+db_migration_username = "spoony_migrator"
+db_app_username       = "spoony_app"
 
 # CORS: origins allowed by the backend (comma separated, no spaces).
 # Use the real mobile/web origins; "*" is NOT recommended for an authenticated API.
@@ -44,6 +49,10 @@ acm_certificate_arn = "arn:aws:acm:eu-west-3:123456789012:certificate/xxxxxxxx-x
 
 # GitHub repo allowed to deploy via OIDC.
 github_repo = "MartinChrrr/Spoony-back"
+
+# If the account already has the GitHub Actions OIDC provider, set its ARN.
+# Otherwise leave empty and this stack creates it.
+github_oidc_provider_arn = ""
 
 # Log retention
 log_retention_days = 30

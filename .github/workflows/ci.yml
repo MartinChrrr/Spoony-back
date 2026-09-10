@@ -44,6 +44,8 @@ jobs:
           push: false
           load: false
           tags: spoony-backend:ci
+          cache-from: type=gha,scope=spoony-backend
+          cache-to: type=gha,mode=max,scope=spoony-backend
 
       - name: Scan secrets with gitleaks
         uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
@@ -71,9 +73,10 @@ jobs:
 
     env:
       SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/spoony_test
-      SPRING_DATASOURCE_USERNAME: spoony_test
-      SPRING_DATASOURCE_PASSWORD: spoony_test
+      SPRING_DATASOURCE_USERNAME: spoony_app_ci
+      SPRING_DATASOURCE_PASSWORD: spoony_app_ci_password
       SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_FLYWAY_ENABLED: 'false'
       SPRING_JPA_SHOW_SQL: 'false'
 
     steps:
@@ -87,7 +90,24 @@ jobs:
           java-version: '21'
           cache: maven
 
-      - name: Run tests against PostgreSQL 16
+      - name: Package the one-shot migration runner
+        run: ./mvnw package -B -DskipTests
+
+      - name: Bootstrap DB roles and run Flyway
+        env:
+          DATABASE_URL: jdbc:postgresql://localhost:5432/spoony_test
+          DATABASE_ADMIN_USER: spoony_test
+          DATABASE_ADMIN_PASSWORD: spoony_test
+          DATABASE_MIGRATION_USER: spoony_migrator_ci
+          DATABASE_MIGRATION_PASSWORD: spoony_migrator_ci_password
+          DATABASE_APP_USER: spoony_app_ci
+          DATABASE_APP_PASSWORD: spoony_app_ci_password
+        run: >-
+          java -cp target/spoony-backend-*.jar
+          -Dloader.main=com.spoony.backend.infrastructure.migration.DatabaseMigrationApplication
+          org.springframework.boot.loader.launch.PropertiesLauncher
+
+      - name: Run tests against PostgreSQL 16 as the runtime role
         run: ./mvnw verify -B
 
   terraform:

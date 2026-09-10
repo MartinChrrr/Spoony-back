@@ -39,9 +39,27 @@ resource "aws_ecs_task_definition" "app" {
 
   container_definitions = jsonencode([
     {
-      name      = "app"
-      image     = var.container_image
-      essential = true
+      name                   = "app"
+      image                  = var.container_image
+      essential              = true
+      user                   = "spoony"
+      readonlyRootFilesystem = true
+      privileged             = false
+
+      linuxParameters = {
+        initProcessEnabled = true
+        capabilities = {
+          drop = ["ALL"]
+        }
+      }
+
+      mountPoints = [
+        {
+          sourceVolume  = "tmp"
+          containerPath = "/tmp"
+          readOnly      = false
+        }
+      ]
 
       portMappings = [
         {
@@ -52,8 +70,9 @@ resource "aws_ecs_task_definition" "app" {
 
       environment = [
         { name = "SPRING_PROFILES_ACTIVE", value = "prod" },
+        { name = "SPRING_FLYWAY_ENABLED", value = "false" },
         { name = "DATABASE_URL", value = local.database_jdbc_url },
-        { name = "DATABASE_USER", value = var.db_username },
+        { name = "DATABASE_USER", value = var.db_app_username },
         { name = "CORS_ALLOWED_ORIGINS", value = var.cors_allowed_origins },
         { name = "JWT_ACCESS_EXPIRATION", value = var.jwt_access_expiration },
       ]
@@ -61,7 +80,7 @@ resource "aws_ecs_task_definition" "app" {
       secrets = [
         {
           name      = "DATABASE_PASSWORD"
-          valueFrom = aws_secretsmanager_secret.db_password.arn
+          valueFrom = aws_secretsmanager_secret.db_app_password.arn
         },
         {
           name      = "JWT_SECRET"
@@ -87,20 +106,124 @@ resource "aws_ecs_task_definition" "app" {
         retries     = 3
         startPeriod = 60
       }
+
+      stopTimeout = 30
     }
   ])
+
+  volume {
+    name = "tmp"
+  }
 
   tags = {
     Name = "${local.name_prefix}-app"
   }
 }
 
+# Flyway and role bootstrap run outside the web service. The workflow replaces
+# the placeholder image, starts one task, waits for exit code 0, then deploys the
+# long-running service. Admin/migrator secrets never enter the web container.
+resource "aws_ecs_task_definition" "migration" {
+  family                   = "${local.name_prefix}-migration"
+  requires_compatibilities = ["FARGATE"]
+  network_mode             = "awsvpc"
+  cpu                      = 256
+  memory                   = 512
+  execution_role_arn       = aws_iam_role.ecs_execution.arn
+  task_role_arn            = aws_iam_role.ecs_task.arn
+
+  runtime_platform {
+    operating_system_family = "LINUX"
+    cpu_architecture        = "X86_64"
+  }
+
+  container_definitions = jsonencode([
+    {
+      name                   = "migration"
+      image                  = var.container_image
+      essential              = true
+      user                   = "spoony"
+      readonlyRootFilesystem = true
+      privileged             = false
+
+      entryPoint = ["java"]
+      command = [
+        "-cp",
+        "app.jar",
+        "-Dloader.main=com.spoony.backend.infrastructure.migration.DatabaseMigrationApplication",
+        "org.springframework.boot.loader.launch.PropertiesLauncher",
+      ]
+
+      linuxParameters = {
+        initProcessEnabled = true
+        capabilities = {
+          drop = ["ALL"]
+        }
+      }
+
+      mountPoints = [
+        {
+          sourceVolume  = "tmp"
+          containerPath = "/tmp"
+          readOnly      = false
+        }
+      ]
+
+      environment = [
+        { name = "DATABASE_URL", value = local.database_jdbc_url },
+        { name = "DATABASE_ADMIN_USER", value = var.db_username },
+        { name = "DATABASE_MIGRATION_USER", value = var.db_migration_username },
+        { name = "DATABASE_APP_USER", value = var.db_app_username },
+      ]
+
+      secrets = [
+        {
+          name      = "DATABASE_ADMIN_PASSWORD"
+          valueFrom = aws_secretsmanager_secret.db_password.arn
+        },
+        {
+          name      = "DATABASE_MIGRATION_PASSWORD"
+          valueFrom = aws_secretsmanager_secret.db_migration_password.arn
+        },
+        {
+          name      = "DATABASE_APP_PASSWORD"
+          valueFrom = aws_secretsmanager_secret.db_app_password.arn
+        },
+      ]
+
+      logConfiguration = {
+        logDriver = "awslogs"
+        options = {
+          "awslogs-group"         = aws_cloudwatch_log_group.ecs.name
+          "awslogs-region"        = var.region
+          "awslogs-stream-prefix" = "migration"
+        }
+      }
+
+      stopTimeout = 30
+    }
+  ])
+
+  volume {
+    name = "tmp"
+  }
+
+  tags = {
+    Name = "${local.name_prefix}-migration"
+  }
+}
+
 resource "aws_ecs_service" "app" {
-  name            = "${local.name_prefix}-svc"
-  cluster         = aws_ecs_cluster.main.id
-  task_definition = aws_ecs_task_definition.app.arn
-  desired_count   = var.desired_count
-  launch_type     = "FARGATE"
+  name                   = "${local.name_prefix}-svc"
+  cluster                = aws_ecs_cluster.main.id
+  task_definition        = aws_ecs_task_definition.app.arn
+  desired_count          = var.desired_count
+  launch_type            = "FARGATE"
+  platform_version       = "LATEST"
+  enable_execute_command = false
+
+  deployment_minimum_healthy_percent = 100
+  deployment_maximum_percent         = 200
 
   network_configuration {
     subnets          = aws_subnet.public[*].id

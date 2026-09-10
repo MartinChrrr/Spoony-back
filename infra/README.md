@@ -28,11 +28,14 @@ needs egress. This trades a little exposure surface for roughly **-32 €/mo**.
 
 - An AWS account with admin (or sufficient) rights to create VPC/IAM/ECS/RDS.
 - `terraform` >= 1.10
-- `aws-cli` v2, configured (`aws configure`) for **eu-west-3**.
+- `aws-cli` v2, authenticated with a short-lived session (`aws login`) for
+  **eu-west-3**; avoid long-lived IAM access keys.
 - `docker` (to build/push the first image, if not using the pipeline).
 - A domain and an **ACM certificate in eu-west-3** for production; Terraform
   rejects `environment="prod"` when `acm_certificate_arn` is empty.
 - A versioned, encrypted, private S3 bucket for Terraform state.
+- The expected AWS account ID in `aws_account_id`; the provider refuses every
+  other account to prevent an accidental deployment with the wrong session.
 
 ## Files
 
@@ -43,13 +46,13 @@ needs egress. This trades a little exposure surface for roughly **-32 €/mo**.
 | `terraform.tfvars.example` | Sample values — copy to `terraform.tfvars`. |
 | `network.tf` | VPC, IGW, 2 public + 2 private subnets, routes, 3 security groups. |
 | `ecr.tf` | ECR repo (immutable, scan-on-push, keep last 10 images). |
-| `secrets.tf` | Generated DB password + JWT secret in Secrets Manager. |
+| `secrets.tf` | Separate administrator, Flyway, runtime DB passwords + JWT secret in Secrets Manager. |
 | `rds.tf` | RDS PostgreSQL 16, encrypted, force-SSL parameter group. |
 | `logs.tf` | CloudWatch log group `/ecs/<prefix>`. |
 | `monitoring.tf` | SNS topic and core ALB/ECS/RDS/certificate alarms. |
 | `iam.tf` | ECS execution/task roles, GitHub OIDC provider + deploy role. |
 | `alb.tf` | ALB, target group, conditional HTTP/HTTPS listeners. |
-| `ecs.tf` | Cluster, task definition, service. |
+| `ecs.tf` | Cluster, one-shot migration task, least-privilege web task and service. |
 | `outputs.tf` | Values consumed by the pipeline and this runbook. |
 
 ## Deployment order
@@ -89,55 +92,24 @@ terraform output -raw github_deploy_role_arn   # -> GitHub secret AWS_DEPLOY_ROL
 terraform output -raw ecr_repository_url
 ```
 
-### 3. Push a first image
+### 3. Deploy the first image
 
-Either run the GitHub **Deploy** workflow (manually via *Run workflow*, once the
-repo secrets below are set), **or** build & push manually:
+Use the GitHub **Deploy** workflow, manually via *Run workflow* after setting the
+repository secrets below. It is the supported production path because it keeps
+the required order atomic at pipeline level: build, vulnerability scan, push,
+one-shot role bootstrap/Flyway migration, web rollout, HTTPS smoke test and
+application rollback.
 
-```bash
-ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
-REGION=eu-west-3
-REPO_URL=$(terraform output -raw ecr_repository_url)
-
-aws ecr get-login-password --region "$REGION" \
-  | docker login --username AWS --password-stdin "${ACCOUNT_ID}.dkr.ecr.${REGION}.amazonaws.com"
-
-# build from the repo root (Dockerfile is there)
-docker build -t "${REPO_URL}:bootstrap" ..
-docker push "${REPO_URL}:bootstrap"
-```
-
-If you push manually, you must **register a new task-definition revision** that
-points at the pushed image and then update the service. (`--force-new-deployment`
-alone just re-runs the *same* placeholder revision and will not pick up the new
-image.)
-
-```bash
-CLUSTER=$(terraform output -raw ecs_cluster_name)
-SERVICE=$(terraform output -raw ecs_service_name)
-FAMILY=$(terraform output -raw ecs_task_family)
-
-# take the current task def, swap the image, register a new revision
-aws ecs describe-task-definition --task-definition "$FAMILY" \
-  --query 'taskDefinition' --output json \
-  | jq --arg IMG "${REPO_URL}:bootstrap" \
-      'del(.taskDefinitionArn,.revision,.status,.requiresAttributes,.compatibilities,.registeredAt,.registeredBy) | .containerDefinitions[0].image=$IMG' \
-  > /tmp/td.json
-NEW_TD=$(aws ecs register-task-definition --cli-input-json file:///tmp/td.json \
-  --query 'taskDefinition.taskDefinitionArn' --output text)
-
-aws ecs update-service --cluster "$CLUSTER" --service "$SERVICE" \
-  --task-definition "$NEW_TD" --desired-count 1 --region "$REGION"
-```
-
-> In practice the simplest path is to set the GitHub secrets (step below) and
-> let the **Deploy** workflow build, scan, push, register and roll out the first
-> image automatically.
+Do not start the service after a simple manual image push: that would bypass the
+migration gate and the least-privilege runtime role might not exist yet. If an
+emergency manual deployment is ever needed, reproduce every step of
+`.github/workflows/deploy.yml`, including the migration task and its exit-code
+check, rather than updating the web service directly.
 
 ### 4. Wait for stability
 
-ECS deploys the task; the ALB target becomes healthy once
-`/actuator/health/readiness` returns 200 (allow ~1–2 min for cold start + Flyway).
+The migration task must exit with code 0 first. The web task then returns 200 on
+`/actuator/health/readiness` after its cold start (allow roughly 1–2 minutes).
 
 ```bash
 aws ecs wait services-stable \
@@ -166,6 +138,7 @@ variables → Actions), all sourced from Terraform outputs:
 | `ECS_CLUSTER` | `terraform output -raw ecs_cluster_name` |
 | `ECS_SERVICE` | `terraform output -raw ecs_service_name` |
 | `ECS_TASK_FAMILY` | `terraform output -raw ecs_task_family` (e.g. `spoony-prod-app`) |
+| `ECS_MIGRATION_TASK_FAMILY` | `terraform output -raw ecs_migration_task_family` |
 | `API_BASE_URL` | Public HTTPS API origin used by the post-deploy smoke test |
 
 Also create a protected GitHub **Environment** named `production` (the workflow
@@ -198,10 +171,11 @@ scheduled scale-to-zero could lower the V0 cost further.
 
 ## Security / TODO post-V0
 
-- **Dedicated least-privilege DB user.** For the V0 the app uses the RDS master
-  user. Create a non-superuser role with only the privileges it needs on the
-  `spoony` schema, store its credentials in a separate secret, and point
-  `DATABASE_USER` / `DATABASE_PASSWORD` at it.
+- **Separated database roles.** The CD runs a short-lived migration task with
+  administrator + Flyway credentials. It creates/rotates the migrator and
+  runtime roles, applies Flyway, then grants DML only. The web task receives
+  only the runtime secret and starts with Flyway disabled. Database migrations
+  must remain backward-compatible because ECS rollback does not undo SQL.
 - **Secret rotation.** Enable Secrets Manager rotation for the DB password
   (AWS PostgreSQL single-user rotation Lambda). The JWT secret needs an in-app
   multi-key (`kid`) strategy before it can be rotated without logging everyone
@@ -231,7 +205,7 @@ scheduled scale-to-zero could lower the V0 cost further.
 - **Backups**: automated RDS backups retained **7 days**;
   `deletion_protection = true` and a final snapshot on destroy guard against
   accidental data loss.
-- **Secrets**: DB password and JWT key are generated by Terraform and stored in
-  Secrets Manager; they are never written to the task definition in clear (only
-  `valueFrom` ARN references are).
+- **Secrets**: administrator, migrator, runtime DB passwords and the JWT key are
+  generated by Terraform and stored in Secrets Manager; they are never written
+  to task definitions in clear (only `valueFrom` ARN references are).
 ```

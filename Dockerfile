@@ -1,13 +1,19 @@
-FROM eclipse-temurin:21-jdk-alpine AS build
+# syntax=docker/dockerfile:1.7
+
+FROM eclipse-temurin:21-jdk-alpine@sha256:6ea5548706b60ac0a602eaf48af74792cbab012d90e811ca8db6184b16b5c3d6 AS build
 WORKDIR /app
 COPY pom.xml .
 COPY mvnw .
 COPY .mvn .mvn
-RUN chmod +x mvnw && ./mvnw dependency:go-offline -B
+RUN chmod +x mvnw
 COPY src ./src
-RUN ./mvnw clean package -DskipTests -B
+# BuildKit persists Maven artifacts between builds. Running dependency:go-offline
+# here downloaded the complete Maven plugin graph (including unused optional
+# BOMs) and made cold CI builds several minutes slower than the actual package.
+RUN --mount=type=cache,target=/root/.m2 \
+    ./mvnw clean package -DskipTests -B
 
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:21-jre-alpine@sha256:974b08960c5d96694c780e65b2d5705268ab1e1ca1a0dd0caf4ba6c3fe34d699
 RUN addgroup -S spoony && adduser -S spoony -G spoony
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar

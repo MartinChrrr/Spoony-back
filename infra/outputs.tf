@@ -32,6 +32,11 @@ output "ecs_task_family" {
   value       = aws_ecs_task_definition.app.family
 }
 
+output "ecs_migration_task_family" {
+  description = "One-shot database bootstrap/Flyway task family used by the CD pipeline."
+  value       = aws_ecs_task_definition.migration.family
+}
+
 output "task_execution_role_arn" {
   description = "ECS task execution role ARN."
   value       = aws_iam_role.ecs_execution.arn
@@ -48,8 +53,18 @@ output "github_deploy_role_arn" {
 }
 
 output "db_secret_arn" {
-  description = "Secrets Manager ARN of the DB password."
+  description = "Secrets Manager ARN of the least-privilege runtime DB password."
+  value       = aws_secretsmanager_secret.db_app_password.arn
+}
+
+output "db_admin_secret_arn" {
+  description = "Secrets Manager ARN of the RDS administrator password, used only by the migration task."
   value       = aws_secretsmanager_secret.db_password.arn
+}
+
+output "db_migration_secret_arn" {
+  description = "Secrets Manager ARN of the Flyway migration role password."
+  value       = aws_secretsmanager_secret.db_migration_password.arn
 }
 
 output "jwt_secret_arn" {

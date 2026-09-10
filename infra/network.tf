@@ -98,7 +98,7 @@ resource "aws_route_table_association" "private" {
 # Security groups
 # -----------------------------------------------------------------------------
 
-# ALB: public HTTP/HTTPS in, all out.
+# ALB: public HTTP/HTTPS in, backend port only out.
 resource "aws_security_group" "alb" {
   name        = "${local.name_prefix}-alb-sg"
   description = "ALB ingress from the Internet on 80/443."
@@ -121,11 +121,11 @@ resource "aws_security_group" "alb" {
   }
 
   egress {
-    description = "All outbound"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
+    description = "Backend targets inside the VPC"
+    from_port   = 8080
+    to_port     = 8080
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
   }
 
   tags = {
@@ -133,7 +133,8 @@ resource "aws_security_group" "alb" {
   }
 }
 
-# App (Fargate tasks): only the ALB may reach :8080. All out (for ECR/Logs/etc).
+# App (Fargate tasks): only the ALB may reach :8080. Egress is limited to
+# PostgreSQL, HTTPS dependencies and the VPC DNS resolver.
 resource "aws_security_group" "app" {
   name        = "${local.name_prefix}-app-sg"
   description = "Fargate tasks: ingress 8080 from the ALB only."
@@ -148,11 +149,35 @@ resource "aws_security_group" "app" {
   }
 
   egress {
-    description = "All outbound (ECR, CloudWatch Logs, Secrets Manager, RDS)"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+    description = "HTTPS for ECR, S3 image layers, Logs and Secrets Manager"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  egress {
+    description = "PostgreSQL inside the VPC"
+    from_port   = 5432
+    to_port     = 5432
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    description = "DNS over UDP to the VPC resolver"
+    from_port   = 53
+    to_port     = 53
+    protocol    = "udp"
+    cidr_blocks = [var.vpc_cidr]
+  }
+
+  egress {
+    description = "DNS over TCP to the VPC resolver"
+    from_port   = 53
+    to_port     = 53
+    protocol    = "tcp"
+    cidr_blocks = [var.vpc_cidr]
   }
 
   tags = {
@@ -174,16 +199,8 @@ resource "aws_security_group" "rds" {
     security_groups = [aws_security_group.app.id]
   }
 
-  # RDS never initiates outbound connections to the Internet; keep egress
-  # inside the VPC only (responses to inbound are allowed regardless — SGs are
-  # stateful).
-  egress {
-    description = "Intra-VPC only"
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = [var.vpc_cidr]
-  }
+  # No egress rule is required: security groups are stateful, so responses to
+  # app-initiated PostgreSQL connections are still allowed.
 
   tags = {
     Name = "${local.name_prefix}-rds-sg"

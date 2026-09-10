@@ -48,18 +48,32 @@ jobs:
         id: ecr-login
         uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2
 
-      # Build locally (load into the runner's Docker) but do NOT push yet: the
-      # Trivy scan below gates the push.
-      - name: Build Docker image (no push)
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Resolve immutable image references
         env:
           REGISTRY: ${{ steps.ecr-login.outputs.registry }}
           REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
         run: |
           IMAGE_SHA="${REGISTRY}/${REPOSITORY}:${SOURCE_SHA}"
           IMAGE_SHORT="${REGISTRY}/${REPOSITORY}:sha-${SOURCE_SHA::7}"
-          docker build -t "$IMAGE_SHA" -t "$IMAGE_SHORT" .
           echo "IMAGE_SHA=$IMAGE_SHA" >> "$GITHUB_ENV"
           echo "IMAGE_SHORT=$IMAGE_SHORT" >> "$GITHUB_ENV"
+
+      # Load locally but do not push yet: the Trivy scan gates publication.
+      - name: Build Docker image (no push)
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          load: true
+          tags: |
+            ${{ env.IMAGE_SHA }}
+            ${{ env.IMAGE_SHORT }}
+          cache-from: type=gha,scope=spoony-backend
+          cache-to: type=gha,mode=max,scope=spoony-backend
 
       # GATING: fail the job on any fixable CRITICAL/HIGH vulnerability.
       - name: Scan image with Trivy
@@ -76,9 +90,9 @@ jobs:
           docker push "$IMAGE_SHA"
           docker push "$IMAGE_SHORT"
 
-      # Pull the live task definition so we only swap the image, preserving every
-      # other field (env, secrets, roles) managed by Terraform.
-      - name: Download current task definition
+      # Pull both Terraform-managed task definitions so only the immutable image
+      # changes. The one-shot migration must succeed before the web rollout.
+      - name: Download current task definitions and service network
         run: |
           PREVIOUS_TASK_DEFINITION="$(aws ecs describe-task-definition \
             --task-definition "${{ secrets.ECS_TASK_FAMILY }}" \
@@ -95,6 +109,60 @@ jobs:
             --task-definition "${{ secrets.ECS_TASK_FAMILY }}" \
             --query 'taskDefinition' \
             --output json > task-definition.json
+          aws ecs describe-task-definition \
+            --task-definition "${{ secrets.ECS_MIGRATION_TASK_FAMILY }}" \
+            --query 'taskDefinition' \
+            --output json > migration-task-definition.json
+          aws ecs describe-services \
+            --cluster "${{ secrets.ECS_CLUSTER }}" \
+            --services "${{ secrets.ECS_SERVICE }}" \
+            --query 'services[0].networkConfiguration' \
+            --output json > network-configuration.json
+
+      - name: Render migration image into the task definition
+        id: render-migration
+        uses: aws-actions/amazon-ecs-render-task-definition@138c24f321fdbdf7edee4a685519d253cae2cdea # v1
+        with:
+          task-definition: migration-task-definition.json
+          container-name: migration
+          image: ${{ env.IMAGE_SHA }}
+
+      - name: Run database bootstrap and Flyway migrations
+        env:
+          MIGRATION_DEFINITION: ${{ steps.render-migration.outputs.task-definition }}
+        run: |
+          MIGRATION_TASK_DEFINITION="$(aws ecs register-task-definition \
+            --cli-input-json "file://${MIGRATION_DEFINITION}" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)"
+
+          RUN_RESULT="$(aws ecs run-task \
+            --cluster "${{ secrets.ECS_CLUSTER }}" \
+            --task-definition "$MIGRATION_TASK_DEFINITION" \
+            --launch-type FARGATE \
+            --platform-version LATEST \
+            --network-configuration "file://network-configuration.json" \
+            --started-by "github-actions-${GITHUB_RUN_ID}" \
+            --count 1)"
+
+          if [ "$(jq '.failures | length' <<<"$RUN_RESULT")" -ne 0 ]; then
+            jq '.failures' <<<"$RUN_RESULT"
+            exit 1
+          fi
+
+          MIGRATION_TASK_ARN="$(jq -r '.tasks[0].taskArn' <<<"$RUN_RESULT")"
+          aws ecs wait tasks-stopped \
+            --cluster "${{ secrets.ECS_CLUSTER }}" \
+            --tasks "$MIGRATION_TASK_ARN"
+          aws ecs describe-tasks \
+            --cluster "${{ secrets.ECS_CLUSTER }}" \
+            --tasks "$MIGRATION_TASK_ARN" > migration-result.json
+
+          EXIT_CODE="$(jq -r '.tasks[0].containers[] | select(.name == "migration") | .exitCode' migration-result.json)"
+          if [ "$EXIT_CODE" != "0" ]; then
+            jq '{stoppedReason: .tasks[0].stoppedReason, containers: .tasks[0].containers}' migration-result.json
+            exit 1
+          fi
 
       - name: Render new image into the task definition
         id: render

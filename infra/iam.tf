@@ -34,7 +34,8 @@ resource "aws_iam_role_policy_attachment" "ecs_execution_managed" {
   policy_arn = "arn:${data.aws_partition.current.partition}:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
 }
 
-# Inline policy: allow reading exactly the two secrets injected into the task,
+# Inline policy: allow reading exactly the secrets injected into the web and
+# one-shot migration tasks,
 # and writing to the task's log group.
 data "aws_iam_policy_document" "ecs_execution_extra" {
   statement {
@@ -45,6 +46,8 @@ data "aws_iam_policy_document" "ecs_execution_extra" {
     ]
     resources = [
       aws_secretsmanager_secret.db_password.arn,
+      aws_secretsmanager_secret.db_migration_password.arn,
+      aws_secretsmanager_secret.db_app_password.arn,
       aws_secretsmanager_secret.jwt_secret.arn,
     ]
   }
@@ -85,6 +88,8 @@ resource "aws_iam_role" "ecs_task" {
 # (c) GitHub OIDC provider + deploy role.
 # ---------------------------------------------------------------------------
 resource "aws_iam_openid_connect_provider" "github" {
+  count = var.github_oidc_provider_arn == "" ? 1 : 0
+
   url            = "https://token.actions.githubusercontent.com"
   client_id_list = ["sts.amazonaws.com"]
   # GitHub's OIDC certificate thumbprint (well-known value). AWS now validates the
@@ -97,6 +102,10 @@ resource "aws_iam_openid_connect_provider" "github" {
   }
 }
 
+locals {
+  github_oidc_provider_arn = var.github_oidc_provider_arn != "" ? var.github_oidc_provider_arn : aws_iam_openid_connect_provider.github[0].arn
+}
+
 # Trust: only the configured repo, on the main branch OR the "production"
 # GitHub Environment, may assume the role.
 data "aws_iam_policy_document" "github_deploy_assume" {
@@ -105,7 +114,7 @@ data "aws_iam_policy_document" "github_deploy_assume" {
 
     principals {
       type        = "Federated"
-      identifiers = [aws_iam_openid_connect_provider.github.arn]
+      identifiers = [local.github_oidc_provider_arn]
     }
 
     condition {
@@ -171,6 +180,34 @@ data "aws_iam_policy_document" "github_deploy" {
       "ecs:RegisterTaskDefinition",
     ]
     resources = ["*"]
+  }
+
+  statement {
+    sid     = "RunMigrationTask"
+    effect  = "Allow"
+    actions = ["ecs:RunTask"]
+    resources = [
+      "arn:${data.aws_partition.current.partition}:ecs:${var.region}:${var.aws_account_id}:task-definition/${aws_ecs_task_definition.migration.family}:*",
+    ]
+    condition {
+      test     = "ArnEquals"
+      variable = "ecs:cluster"
+      values   = [aws_ecs_cluster.main.arn]
+    }
+  }
+
+  statement {
+    sid     = "DescribeMigrationTask"
+    effect  = "Allow"
+    actions = ["ecs:DescribeTasks"]
+    resources = [
+      "arn:${data.aws_partition.current.partition}:ecs:${var.region}:${var.aws_account_id}:task/${aws_ecs_cluster.main.name}/*",
+    ]
+    condition {
+      test     = "ArnEquals"
+      variable = "ecs:cluster"
+      values   = [aws_ecs_cluster.main.arn]
+    }
   }
 
   # Update/Describe the service: scoped to exactly this service's ARN.
