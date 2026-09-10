@@ -29,7 +29,9 @@ needs egress. This trades a little exposure surface for roughly **-32 €/mo**.
 - An AWS account with admin (or sufficient) rights to create VPC/IAM/ECS/RDS.
 - `terraform` >= 1.10
 - `aws-cli` v2, authenticated with a short-lived session (`aws login`) for
-  **eu-west-3**; avoid long-lived IAM access keys.
+  **eu-west-3**; avoid long-lived IAM access keys. Configure the local
+  `terraform` credential-process profile shown in `DEPLOY.md`, because the AWS
+  provider version pinned here does not read `login_session` directly.
 - `docker` (to build/push the first image, if not using the pipeline).
 - A domain and an **ACM certificate in eu-west-3** for production; Terraform
   rejects `environment="prod"` when `acm_certificate_arn` is empty.
@@ -63,7 +65,7 @@ needs egress. This trades a little exposure surface for roughly **-32 €/mo**.
 cd infra
 cp backend-prod.hcl.example backend-prod.hcl
 # edit backend-prod.hcl with the pre-created state bucket
-terraform init -backend-config=backend-prod.hcl
+AWS_PROFILE=terraform terraform init -backend-config=backend-prod.hcl
 ```
 
 The bucket bootstrap commands are in `DEPLOY.md`. State is encrypted and
@@ -75,7 +77,7 @@ not an accepted production mode.
 ```bash
 cp terraform.tfvars.example terraform.tfvars
 # edit terraform.tfvars: cors_allowed_origins (required), acm_certificate_arn, etc.
-terraform apply
+AWS_PROFILE=terraform terraform apply
 ```
 
 This creates the VPC, ECR, RDS, secrets, ALB and ECS service. Keep

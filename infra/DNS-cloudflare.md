@@ -38,6 +38,12 @@ sudo dnf install -y jq
 
 aws login              # session temporaire via le navigateur
 aws sts get-caller-identity   # doit afficher ton compte
+
+# Pont compatible avec le provider Terraform, sans clé longue durée :
+aws configure set credential_process \
+  "aws configure export-credentials --profile default --format process" \
+  --profile terraform
+aws configure set region eu-west-3 --profile terraform
 ```
 
 ## 2. Certificat ACM (en `eu-west-3`, **avant** l'ALB)
@@ -82,9 +88,9 @@ acm_certificate_arn = "arn:aws:acm:eu-west-3:<account>:certificate/<id>"
 
 ```bash
 cd infra
-terraform init -backend-config=backend-prod.hcl
-terraform plan
-terraform apply        # "yes"
+AWS_PROFILE=terraform terraform init -backend-config=backend-prod.hcl
+AWS_PROFILE=terraform terraform plan
+AWS_PROFILE=terraform terraform apply        # "yes"
 terraform output -raw alb_dns_name   # -> spoony-prod-alb-xxxx.eu-west-3.elb.amazonaws.com
 ```
 

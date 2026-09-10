@@ -20,6 +20,14 @@ aws --version
 aws login              # ouvre le navigateur et crée une session temporaire
 aws sts get-caller-identity   # doit afficher ton compte
 
+# Le provider Terraform AWS v5 ne lit pas encore directement login_session.
+# Créer une fois ce profil relais, qui n'enregistre aucune clé longue durée :
+aws configure set credential_process \
+  "aws configure export-credentials --profile default --format process" \
+  --profile terraform
+aws configure set region eu-west-3 --profile terraform
+aws sts get-caller-identity --profile terraform
+
 # Docker (pour la 1re image si tu ne passes pas par le pipeline)
 docker --version
 
@@ -65,7 +73,7 @@ puis initialiser avec `terraform init -backend-config=backend-prod.hcl`.
 ```bash
 cd infra
 
-terraform init -backend-config=backend-prod.hcl
+AWS_PROFILE=terraform terraform init -backend-config=backend-prod.hcl
 
 cp terraform.tfvars.example terraform.tfvars
 # Éditer terraform.tfvars :
@@ -76,8 +84,8 @@ cp terraform.tfvars.example terraform.tfvars
 #   - laisser desired_count=0 pour ce premier apply sûr
 #   - si un provider OIDC GitHub existe déjà dans le compte, renseigner son ARN
 
-terraform plan                       # relire ce qui va être créé
-terraform apply                      # taper "yes"
+AWS_PROFILE=terraform terraform plan   # relire ce qui va être créé
+AWS_PROFILE=terraform terraform apply  # taper "yes"
 ```
 
 Crée : VPC (sans NAT), RDS PostgreSQL chiffrée, ECR, Secrets Manager (mots de
