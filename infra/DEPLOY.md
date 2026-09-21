@@ -1,5 +1,8 @@
 # Déploiement AWS V0 — guide pas-à-pas
 
+> **Archive opérationnelle : ne pas exécuter pour la bêta low-cost.** Le runbook
+> actif est désormais [`../infra-ec2/DEPLOY.md`](../infra-ec2/DEPLOY.md).
+
 Mise en ligne du backend Spoony sur **AWS ECS Fargate** en **eu-west-3 (Paris)**.
 Ce fichier est la checklist actionnable ; voir [`README.md`](./README.md) pour
 l'architecture détaillée, les coûts et la dette post-V0.

@@ -124,13 +124,23 @@ jobs:
           terraform_version: '1.10.5'
 
       - name: Check formatting
-        working-directory: infra
-        run: terraform fmt -check -recursive
+        run: terraform fmt -check -recursive infra infra-ec2
 
-      - name: Initialise providers without the remote backend
+      - name: Validate archived ECS/RDS stack
         working-directory: infra
-        run: terraform init -backend=false -input=false
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
 
-      - name: Validate configuration
-        working-directory: infra
-        run: terraform validate
+      - name: Validate and test active EC2 stack
+        working-directory: infra-ec2
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+          terraform test
+
+      - name: Validate state bucket bootstrap
+        working-directory: infra-ec2/bootstrap
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate

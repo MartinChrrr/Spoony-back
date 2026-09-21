@@ -1,4 +1,4 @@
-name: Deploy
+name: Deploy EC2
 
 on:
   workflow_run:
@@ -7,25 +7,21 @@ on:
     branches: [main]
   workflow_dispatch:
 
-# OIDC: request a token to assume the AWS deploy role; read the repo contents.
 permissions:
   id-token: write
   contents: read
 
-# Serialise deploys on the same ref (do not cancel a running deploy: an aborted
-# ECS rollout could leave the service half-updated).
 concurrency:
-  group: deploy-${{ github.event.workflow_run.head_branch || github.ref }}
+  group: deploy-ec2-production
   cancel-in-progress: false
 
 env:
   AWS_REGION: eu-west-3
-  CONTAINER_NAME: app
   SOURCE_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
 
 jobs:
   deploy:
-    name: Build, scan and deploy
+    name: Build ARM64, scan and deploy through SSM
     if: >-
       (github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') ||
       (github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main')
@@ -33,174 +29,130 @@ jobs:
     environment: production
 
     steps:
-      - name: Checkout
+      - name: Checkout tested revision
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           ref: ${{ env.SOURCE_SHA }}
 
-      - name: Configure AWS credentials (OIDC)
+      - name: Configure AWS credentials with OIDC
         uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
         with:
           role-to-assume: ${{ secrets.AWS_DEPLOY_ROLE_ARN }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: Login to Amazon ECR
-        id: ecr-login
-        uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@68827325e0b33c7199eb31dd4e31fbe9023e06e3 # v3
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
 
-      - name: Resolve immutable image references
-        env:
-          REGISTRY: ${{ steps.ecr-login.outputs.registry }}
-          REPOSITORY: ${{ secrets.ECR_REPOSITORY }}
-        run: |
-          IMAGE_SHA="${REGISTRY}/${REPOSITORY}:${SOURCE_SHA}"
-          IMAGE_SHORT="${REGISTRY}/${REPOSITORY}:sha-${SOURCE_SHA::7}"
-          echo "IMAGE_SHA=$IMAGE_SHA" >> "$GITHUB_ENV"
-          echo "IMAGE_SHORT=$IMAGE_SHORT" >> "$GITHUB_ENV"
-
-      # Load locally but do not push yet: the Trivy scan gates publication.
-      - name: Build Docker image (no push)
+      - name: Build immutable ARM64 image archive
         uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
         with:
           context: .
           file: ./Dockerfile
-          push: false
-          load: true
-          tags: |
-            ${{ env.IMAGE_SHA }}
-            ${{ env.IMAGE_SHORT }}
-          cache-from: type=gha,scope=spoony-backend
-          cache-to: type=gha,mode=max,scope=spoony-backend
+          platforms: linux/arm64
+          tags: spoony-backend:${{ env.SOURCE_SHA }}
+          outputs: type=docker,dest=/tmp/backend-image.tar
+          cache-from: type=gha,scope=spoony-backend-arm64
+          cache-to: type=gha,mode=max,scope=spoony-backend-arm64
 
-      # GATING: fail the job on any fixable CRITICAL/HIGH vulnerability.
-      - name: Scan image with Trivy
+      - name: Scan image archive with Trivy
         uses: aquasecurity/trivy-action@915b19bbe73b92a6cf82a1bc12b087c9a19a5fe2 # v0.28.0
         with:
-          image-ref: ${{ env.IMAGE_SHA }}
+          input: /tmp/backend-image.tar
           format: table
           severity: CRITICAL,HIGH
-          exit-code: '1'
+          exit-code: "1"
           ignore-unfixed: true
 
-      - name: Push image to ECR
+      - name: Assemble deployment bundle
         run: |
-          docker push "$IMAGE_SHA"
-          docker push "$IMAGE_SHORT"
+          set -Eeuo pipefail
+          install -d release
+          gzip -9 /tmp/backend-image.tar
+          mv /tmp/backend-image.tar.gz release/backend-image.tar.gz
+          cp infra-ec2/docker-compose.production.yml infra-ec2/Caddyfile release/
+          cp infra-ec2/scripts/deploy-release.sh release/
+          cp infra-ec2/scripts/rollback-release.sh release/
+          cp infra-ec2/scripts/backup-postgres.sh release/
+          cp infra-ec2/scripts/spoony-backup.service release/
+          cp infra-ec2/scripts/spoony-backup.timer release/
+          tar -C release -czf /tmp/spoony-release.tar.gz .
 
-      # Pull both Terraform-managed task definitions so only the immutable image
-      # changes. The one-shot migration must succeed before the web rollout.
-      - name: Download current task definitions and service network
-        run: |
-          PREVIOUS_TASK_DEFINITION="$(aws ecs describe-task-definition \
-            --task-definition "${{ secrets.ECS_TASK_FAMILY }}" \
-            --query 'taskDefinition.taskDefinitionArn' \
-            --output text)"
-          echo "PREVIOUS_TASK_DEFINITION=$PREVIOUS_TASK_DEFINITION" >> "$GITHUB_ENV"
-          PREVIOUS_DESIRED_COUNT="$(aws ecs describe-services \
-            --cluster "${{ secrets.ECS_CLUSTER }}" \
-            --services "${{ secrets.ECS_SERVICE }}" \
-            --query 'services[0].desiredCount' \
-            --output text)"
-          echo "PREVIOUS_DESIRED_COUNT=$PREVIOUS_DESIRED_COUNT" >> "$GITHUB_ENV"
-          aws ecs describe-task-definition \
-            --task-definition "${{ secrets.ECS_TASK_FAMILY }}" \
-            --query 'taskDefinition' \
-            --output json > task-definition.json
-          aws ecs describe-task-definition \
-            --task-definition "${{ secrets.ECS_MIGRATION_TASK_FAMILY }}" \
-            --query 'taskDefinition' \
-            --output json > migration-task-definition.json
-          aws ecs describe-services \
-            --cluster "${{ secrets.ECS_CLUSTER }}" \
-            --services "${{ secrets.ECS_SERVICE }}" \
-            --query 'services[0].networkConfiguration' \
-            --output json > network-configuration.json
-
-      - name: Render migration image into the task definition
-        id: render-migration
-        uses: aws-actions/amazon-ecs-render-task-definition@138c24f321fdbdf7edee4a685519d253cae2cdea # v1
-        with:
-          task-definition: migration-task-definition.json
-          container-name: migration
-          image: ${{ env.IMAGE_SHA }}
-
-      - name: Run database bootstrap and Flyway migrations
+      - name: Upload immutable deployment bundle
         env:
-          MIGRATION_DEFINITION: ${{ steps.render-migration.outputs.task-definition }}
+          ARTIFACT_BUCKET: ${{ vars.AWS_ARTIFACT_BUCKET }}
         run: |
-          MIGRATION_TASK_DEFINITION="$(aws ecs register-task-definition \
-            --cli-input-json "file://${MIGRATION_DEFINITION}" \
-            --query 'taskDefinition.taskDefinitionArn' \
-            --output text)"
+          set -Eeuo pipefail
+          test -n "$ARTIFACT_BUCKET"
+          aws s3 cp /tmp/spoony-release.tar.gz \
+            "s3://${ARTIFACT_BUCKET}/releases/${SOURCE_SHA}/spoony-release.tar.gz" \
+            --sse AES256 --only-show-errors
 
-          RUN_RESULT="$(aws ecs run-task \
-            --cluster "${{ secrets.ECS_CLUSTER }}" \
-            --task-definition "$MIGRATION_TASK_DEFINITION" \
-            --launch-type FARGATE \
-            --platform-version LATEST \
-            --network-configuration "file://network-configuration.json" \
-            --started-by "github-actions-${GITHUB_RUN_ID}" \
-            --count 1)"
-
-          if [ "$(jq '.failures | length' <<<"$RUN_RESULT")" -ne 0 ]; then
-            jq '.failures' <<<"$RUN_RESULT"
-            exit 1
-          fi
-
-          MIGRATION_TASK_ARN="$(jq -r '.tasks[0].taskArn' <<<"$RUN_RESULT")"
-          aws ecs wait tasks-stopped \
-            --cluster "${{ secrets.ECS_CLUSTER }}" \
-            --tasks "$MIGRATION_TASK_ARN"
-          aws ecs describe-tasks \
-            --cluster "${{ secrets.ECS_CLUSTER }}" \
-            --tasks "$MIGRATION_TASK_ARN" > migration-result.json
-
-          EXIT_CODE="$(jq -r '.tasks[0].containers[] | select(.name == "migration") | .exitCode' migration-result.json)"
-          if [ "$EXIT_CODE" != "0" ]; then
-            jq '{stoppedReason: .tasks[0].stoppedReason, containers: .tasks[0].containers}' migration-result.json
-            exit 1
-          fi
-
-      - name: Render new image into the task definition
-        id: render
-        uses: aws-actions/amazon-ecs-render-task-definition@138c24f321fdbdf7edee4a685519d253cae2cdea # v1
-        with:
-          task-definition: task-definition.json
-          container-name: ${{ env.CONTAINER_NAME }}
-          image: ${{ env.IMAGE_SHA }}
-
-      - name: Deploy to ECS
+      - name: Deploy on EC2 through Systems Manager
         id: deploy
-        uses: aws-actions/amazon-ecs-deploy-task-definition@c465972ecbd160473f22e683363b422a5412a3de # v2
-        with:
-          task-definition: ${{ steps.render.outputs.task-definition }}
-          service: ${{ secrets.ECS_SERVICE }}
-          cluster: ${{ secrets.ECS_CLUSTER }}
-          wait-for-service-stability: true
-
-      - name: Scale service after first real deployment
-        id: scale
         env:
-          DESIRED_COUNT: ${{ vars.ECS_DESIRED_COUNT || '1' }}
+          INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
+          ARTIFACT_BUCKET: ${{ vars.AWS_ARTIFACT_BUCKET }}
+          PARAMETER_PREFIX: ${{ vars.AWS_PARAMETER_PREFIX }}
+          API_DOMAIN: ${{ vars.API_DOMAIN }}
+          ACME_EMAIL: ${{ vars.ACME_EMAIL }}
+          CORS_ALLOWED_ORIGINS: ${{ vars.CORS_ALLOWED_ORIGINS }}
         run: |
-          aws ecs update-service \
-            --cluster "${{ secrets.ECS_CLUSTER }}" \
-            --service "${{ secrets.ECS_SERVICE }}" \
-            --desired-count "$DESIRED_COUNT" >/dev/null
-          aws ecs wait services-stable \
-            --cluster "${{ secrets.ECS_CLUSTER }}" \
-            --services "${{ secrets.ECS_SERVICE }}"
+          set -Eeuo pipefail
+          test -n "$INSTANCE_ID"
+          test -n "$ARTIFACT_BUCKET"
+          test -n "$PARAMETER_PREFIX"
+          test -n "$API_DOMAIN"
+          test -n "$ACME_EMAIL"
+          test -n "$CORS_ALLOWED_ORIGINS"
+
+          cat > /tmp/remote-command.sh <<EOF
+          set -Eeuo pipefail
+          release_dir="/opt/spoony/releases/${SOURCE_SHA}"
+          install -d -m 0755 "\$release_dir"
+          aws s3 cp "s3://${ARTIFACT_BUCKET}/releases/${SOURCE_SHA}/spoony-release.tar.gz" /tmp/spoony-release.tar.gz --region "${AWS_REGION}" --only-show-errors
+          tar -C "\$release_dir" -xzf /tmp/spoony-release.tar.gz
+          chmod 0755 "\$release_dir/deploy-release.sh"
+          "\$release_dir/deploy-release.sh" "\$release_dir" "spoony-backend:${SOURCE_SHA}" "${AWS_REGION}" "${ARTIFACT_BUCKET}" "${PARAMETER_PREFIX}" "${API_DOMAIN}" "${ACME_EMAIL}" "${CORS_ALLOWED_ORIGINS}"
+          EOF
+          jq -Rs '{commands: [.]}' /tmp/remote-command.sh > /tmp/ssm-parameters.json
+
+          command_id=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --comment "Deploy Spoony ${SOURCE_SHA}" \
+            --parameters file:///tmp/ssm-parameters.json \
+            --query 'Command.CommandId' --output text)
+          echo "command_id=$command_id" >> "$GITHUB_OUTPUT"
+
+          for _ in $(seq 1 60); do
+            status=$(aws ssm get-command-invocation \
+              --command-id "$command_id" --instance-id "$INSTANCE_ID" \
+              --query Status --output text 2>/dev/null || true)
+            case "$status" in
+              Success) break ;;
+              Failed|Cancelled|TimedOut|Cancelling)
+                aws ssm get-command-invocation --command-id "$command_id" --instance-id "$INSTANCE_ID"
+                exit 1
+                ;;
+            esac
+            sleep 10
+          done
+          [[ "$status" == "Success" ]]
+          aws ssm get-command-invocation \
+            --command-id "$command_id" --instance-id "$INSTANCE_ID" \
+            --query '{Status:Status,Output:StandardOutputContent}' --output json
 
       - name: HTTPS smoke test
         id: smoke
         env:
-          API_BASE_URL: ${{ secrets.API_BASE_URL }}
+          API_BASE_URL: ${{ vars.API_BASE_URL }}
         run: |
+          set -Eeuo pipefail
           test -n "$API_BASE_URL"
-          for attempt in $(seq 1 12); do
+          for _ in $(seq 1 18); do
             if curl --fail --silent --show-error \
               "${API_BASE_URL%/}/actuator/health/readiness"; then
               exit 0
@@ -209,17 +161,15 @@ jobs:
           done
           exit 1
 
-      - name: Roll back failed rollout
-        if: >-
-          failure() &&
-          (steps.deploy.outcome == 'success' || steps.deploy.outcome == 'failure')
+      - name: Roll back application after failed public smoke test
+        if: failure() && steps.deploy.outcome == 'success' && steps.smoke.outcome == 'failure'
+        env:
+          INSTANCE_ID: ${{ vars.EC2_INSTANCE_ID }}
         run: |
-          aws ecs update-service \
-            --cluster "${{ secrets.ECS_CLUSTER }}" \
-            --service "${{ secrets.ECS_SERVICE }}" \
-            --task-definition "$PREVIOUS_TASK_DEFINITION" \
-            --desired-count "$PREVIOUS_DESIRED_COUNT" \
-            --force-new-deployment >/dev/null
-          aws ecs wait services-stable \
-            --cluster "${{ secrets.ECS_CLUSTER }}" \
-            --services "${{ secrets.ECS_SERVICE }}"
+          set -Eeuo pipefail
+          command_id=$(aws ssm send-command \
+            --instance-ids "$INSTANCE_ID" \
+            --document-name AWS-RunShellScript \
+            --parameters 'commands=["/opt/spoony/rollback-release.sh"]' \
+            --query 'Command.CommandId' --output text)
+          aws ssm wait command-executed --command-id "$command_id" --instance-id "$INSTANCE_ID"

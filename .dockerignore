@@ -12,3 +12,4 @@ target/
 .env.*
 docker-compose.yml
 infra/
+infra-ec2/

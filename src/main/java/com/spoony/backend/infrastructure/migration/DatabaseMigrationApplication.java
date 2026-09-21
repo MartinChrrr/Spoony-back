@@ -12,11 +12,11 @@ import java.util.Map;
 import java.util.regex.Pattern;
 
 /**
- * One-shot database bootstrap and migration entry point for ECS.
+ * One-shot database bootstrap and migration entry point for deployments.
  *
  * <p>The web task only receives the least-privilege runtime credentials. This
- * process is run as a separate, short-lived ECS task and is the only container
- * that receives the RDS administrator and Flyway migration secrets.</p>
+ * process runs as a separate, short-lived container and is the only process
+ * that receives the database administrator and Flyway migration secrets.</p>
  */
 public final class DatabaseMigrationApplication {
 

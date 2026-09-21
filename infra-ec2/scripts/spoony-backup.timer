@@ -1,0 +1,11 @@
+[Unit]
+Description=Daily Spoony PostgreSQL backup
+
+[Timer]
+OnCalendar=*-*-* 02:15:00 Europe/Paris
+Persistent=true
+RandomizedDelaySec=10m
+Unit=spoony-backup.service
+
+[Install]
+WantedBy=timers.target

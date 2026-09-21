@@ -1,0 +1,14 @@
+aws_account_id       = "123456789012"
+api_domain           = "api.spoonrest.martincharrier.dev"
+acme_email           = "martin@example.com"
+cors_allowed_origins = "https://spoonrest.martincharrier.dev"
+
+# Keep this empty if the account does not already contain GitHub's OIDC provider.
+github_oidc_provider_arn = ""
+
+# Low-cost beta defaults.
+instance_type            = "t4g.small"
+root_volume_size_gib     = 10
+data_volume_size_gib     = 20
+backup_retention_days    = 35
+release_retention_days   = 7

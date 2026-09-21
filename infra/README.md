@@ -1,4 +1,8 @@
-# Spoony backend — AWS infrastructure (Terraform) & deployment runbook
+# Spoony backend — ancienne cible ECS/RDS (migration future)
+
+> **Ne pas appliquer pour la bêta low-cost.** Depuis le 10 septembre 2026, le
+> chemin de déploiement actif est `../infra-ec2/`. Cette stack est conservée
+> comme cible de migration future vers ECS/RDS.
 
 Cost-optimised V0 stack for the Spoony backend (Spring Boot 3.5.11, Java 21,
 port 8080, Spring profile `prod`, PostgreSQL) on **AWS ECS Fargate** in
