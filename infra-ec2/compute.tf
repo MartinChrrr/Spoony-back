@@ -38,6 +38,20 @@ resource "aws_instance" "server" {
     cpu_credits = "standard"
   }
 
+  # The AWS provider reports the separately managed Elastic IP as an
+  # auto-assigned public address after refresh, and folds the separately
+  # attached data disk into ebs_block_device/volume_tags. Those computed
+  # values would otherwise create a perpetual diff and replace the instance.
+  # The EIP and persistent disk remain managed by aws_eip.server,
+  # aws_ebs_volume.data and aws_volume_attachment.data below.
+  lifecycle {
+    ignore_changes = [
+      associate_public_ip_address,
+      ebs_block_device,
+      volume_tags,
+    ]
+  }
+
   volume_tags = {
     Name      = "${local.name_prefix}-root"
     DataClass = "system"
