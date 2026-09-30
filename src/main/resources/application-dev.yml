@@ -11,7 +11,12 @@ spring:
 
 jwt:
   secret: dev-secret-key-min-256-bits-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
-  expiration: 86400000
+  access-expiration: 900000
+  refresh-expiration: 604800000
+
+app:
+  cors:
+    allowed-origins: http://localhost:3000,http://localhost:8081,http://localhost:19006
 
 logging:
   level:

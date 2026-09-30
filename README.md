@@ -2,12 +2,9 @@
 
 API REST pour l'application **Spoony**, une application de gestion de taches basee sur la **Theorie des Cuilleres** (*Spoon Theory*). Concue pour aider les personnes atteintes de maladies chroniques ou de handicaps a gerer leur energie quotidienne de maniere bienveillante.
 
-> ⚠️ **Important — branche de travail**
-> Le developpement actif se fait sur la branche **`dev`**. La branche `main` n'est pas a jour pour le moment.
-> **Travaillez et deployez depuis `dev`** :
-> ```bash
-> git checkout dev
-> ```
+> **Branches** : les changements sont integres sur `dev`, puis promus par pull
+> request vers `main`. Seul un commit de `main` dont la CI a reussi peut
+> declencher le deploiement de production.
 
 ## Stack technique
 
@@ -36,36 +33,54 @@ API REST pour l'application **Spoony**, une application de gestion de taches bas
 git clone git@github.com:MartinChrrr/Spoony-back.git
 cd spoony-backend
 
-# 2. Se placer sur la branche de developpement (IMPORTANT)
+# 2. Se placer sur la branche d'integration
 git checkout dev
 
 # 3. Lancer PostgreSQL et Adminer via Docker
-docker-compose up -d
+# (uniquement la BDD et Adminer — le service backend du compose est demarre
+#  separement, voir la section Docker)
+docker-compose up -d db adminer
 
-# 4. Configurer les variables d'environnement
-# Le fichier .env est deja configure pour le developpement local.
-# Modifiez-le si necessaire.
-
-# 5. Lancer l'application
-./mvnw spring-boot:run
+# 4. Lancer l'application avec le profil dev
+# Le profil doit etre passe explicitement : aucun profil n'est actif par defaut,
+# et sans profil l'application ne demarre pas (pas de datasource configuree).
+./mvnw spring-boot:run -Dspring-boot.run.profiles=dev
 ```
 
 L'API est accessible sur `http://localhost:8080`.
 Adminer (interface BDD) est accessible sur `http://localhost:8081`.
 
+> Note : attendez que le conteneur PostgreSQL soit pret (healthcheck) avant de lancer
+> l'application. Le schema est cree exclusivement par les migrations **Flyway**
+> (`ddl-auto: validate`) : Hibernate ne cree jamais les tables lui-meme.
+
 ## Configuration
 
-Variables d'environnement (fichier `.env`) :
+Le projet utilise 3 profils Spring :
 
-| Variable | Description | Valeur par defaut (dev) |
-|----------|-------------|-------------------------|
-| `DATABASE_URL` | URL JDBC PostgreSQL | `jdbc:postgresql://localhost:5432/spoony_dev` |
-| `DATABASE_USER` | Utilisateur BDD | `spoony` |
-| `DATABASE_PASSWORD` | Mot de passe BDD | `spoony_dev_password` |
-| `JWT_SECRET` | Cle secrete pour signer les tokens JWT | cle de dev (a changer en prod) |
-| `JWT_ACCESS_EXPIRATION` | Duree de vie du token d'acces (ms) | `900000` (15 min) |
-| `JWT_REFRESH_EXPIRATION` | Duree de vie du refresh token (ms) | `604800000` (7 jours) |
-| `SPRING_PROFILES_ACTIVE` | Profil Spring actif | `dev` |
+| Profil | Usage | Source de configuration |
+|--------|-------|-------------------------|
+| `dev` | Developpement local | Valeurs codees en dur dans `application-dev.yml` (BDD locale, secret JWT de dev) |
+| `docker` | Stack Docker Compose complete | Variables d'environnement (injectees par `docker-compose.yml`) |
+| `prod` | Production | Variables d'environnement (obligatoires, pas de valeurs par defaut sensibles) |
+
+Variables d'environnement (lues par les profils `docker` et `prod` — le profil `dev` n'en a pas besoin) :
+
+| Variable | Description | Profils | Defaut |
+|----------|-------------|---------|--------|
+| `DATABASE_URL` | URL JDBC PostgreSQL | docker, prod | — |
+| `DATABASE_USER` | Utilisateur BDD | docker, prod | — |
+| `DATABASE_PASSWORD` | Mot de passe BDD | docker, prod | — |
+| `JWT_SECRET` | Cle secrete pour signer les tokens JWT (min. 256 bits) | docker, prod | — |
+| `JWT_ACCESS_EXPIRATION` | Duree de vie du token d'acces (ms) | docker, prod | `900000` (15 min) |
+| `JWT_REFRESH_EXPIRATION` | Duree de vie du refresh token (ms) | prod uniquement | `604800000` (7 jours) |
+| `CORS_ALLOWED_ORIGINS` | Origines CORS autorisees (liste separee par des virgules) | prod (obligatoire) | `http://localhost:3000` (defaut global) |
+| `SPRING_PROFILES_ACTIVE` | Profil Spring actif | tous | aucun (a definir explicitement) |
+
+> Note : un fichier `.env` peut servir de reference pour vos deploiements, mais il
+> n'est **pas versionne** (gitignore) et n'est **pas charge automatiquement** par
+> `./mvnw spring-boot:run` (pas de dependance dotenv). En dev, tout est deja
+> configure dans `application-dev.yml`.
 
 ## Architecture
 
@@ -75,25 +90,31 @@ Le projet suit une **architecture hexagonale** (Ports & Adapters) :
 src/main/java/com/spoony/backend/
 |
 |-- application/              # Couche Application (adaptateurs entrants)
-|   |-- rest/                 # Controleurs REST + DTOs
-|   |   |-- task/
-|   |   |-- energy/
-|   |   |-- tasklog/
-|   |   |-- suggestion/
-|   |   |-- basetask/
-|   |   |-- message/
-|   |   |-- user/
-|   |   +-- common/           # Reponse JSend, gestion d'erreurs globale
-|   +-- auth/                 # Authentification (register, login, refresh)
+|   |-- auth/                 # Authentification (register, login, refresh)
+|   |-- energy/               # Service applicatif Energy (orchestration)
+|   |-- tasklog/              # Service applicatif TaskLog (orchestration)
+|   +-- rest/                 # Controleurs REST + DTOs
+|       |-- task/
+|       |-- energy/
+|       |-- tasklog/
+|       |-- suggestion/
+|       |-- basetask/
+|       |-- message/
+|       |-- user/
+|       +-- common/           # Reponse JSend, gestion d'erreurs globale
 |
 |-- domain/                   # Couche Domaine (logique metier pure)
 |   |-- task/
 |   |   |-- model/            # Modeles de domaine (POJOs)
-|   |   |-- ports/in/         # Use cases (interfaces entrantes)
-|   |   +-- ports/out/        # Contrats de persistance (interfaces sortantes)
-|   |-- energy/
-|   |-- tasklog/
-|   +-- suggestion/
+|   |   |-- service/          # Implementations des use cases
+|   |   |-- port/in/          # Use cases (interfaces entrantes)
+|   |   +-- port/out/         # Contrats de persistance (interfaces sortantes)
+|   |-- energy/               # (meme structure)
+|   |-- tasklog/              # (meme structure)
+|   |-- suggestion/           # (meme structure + strategy/ : strategies de scoring)
+|   +-- shared/
+|       |-- exception/        # Exceptions metier
+|       +-- port/             # Ports partages entre domaines
 |
 +-- infrastructure/           # Couche Infrastructure (adaptateurs sortants)
     |-- persistence/
@@ -101,8 +122,8 @@ src/main/java/com/spoony/backend/
     |   |-- entity/           # Entites JPA
     |   |-- repository/       # Repositories Spring Data JPA
     |   +-- mapper/           # Mappers entite <-> domaine
-    |-- config/               # Configuration Spring (Security, CORS, OpenAPI)
-    +-- exception/            # Exceptions metier
+    |-- security/             # Filtre JWT, provider de tokens, rate limiting
+    +-- config/               # Configuration Spring (Security, CORS, OpenAPI, scheduler)
 ```
 
 ### Domaines metier
@@ -114,7 +135,15 @@ src/main/java/com/spoony/backend/
 | **TaskLog** | Journal d'execution des taches (planification, completion, report) |
 | **Suggestion** | Moteur de suggestions intelligentes base sur l'energie disponible |
 
+> User, BaseTask et Message sont des features plus legeres gerees directement dans
+> les couches application/persistence (pas de package domaine complet).
+
 ## Endpoints API
+
+Le contrat mobile courant est versionne sous **`/api/v1`**. Les anciens chemins
+`/api/*` restent temporairement disponibles comme alias de compatibilite ; aucun
+nouveau client ne doit les utiliser. La specification OpenAPI est exposee sous
+`/api-docs` et annonce la version `v1`.
 
 Toutes les reponses suivent le format **JSend** :
 
@@ -129,21 +158,28 @@ Toutes les reponses suivent le format **JSend** :
 
 | Methode | Endpoint | Description | Auth |
 |---------|----------|-------------|------|
-| `POST` | `/api/auth/register` | Inscription (email, password, firstName) | Non |
-| `POST` | `/api/auth/login` | Connexion, retourne les tokens JWT | Non |
-| `POST` | `/api/auth/refresh` | Rafraichir le token d'acces | Non |
+| `POST` | `/api/v1/auth/register` | Inscription (email, password, firstName, consentGiven) | Non |
+| `POST` | `/api/v1/auth/login` | Connexion, retourne les tokens JWT | Non |
+| `POST` | `/api/v1/auth/refresh` | Rafraichir le token d'acces | Non |
+| `POST` | `/api/v1/auth/logout` | Revoquer le refresh token | Oui |
 
 Les endpoints proteges necessitent le header : `Authorization: Bearer <token>`
+
+> **Rate limiting local** : par minute, login accepte 50 tentatives par IP et 10
+> par email, register 20 par IP et 5 par email, refresh 120 par IP et 30 par
+> refresh token. Les cles sont hachees et les refus sont metriques. Ce garde-fou
+> est propre a chaque instance ; une production multi-instance doit le completer
+> par AWS WAF ou un stockage distribue.
 
 ### Taches
 
 | Methode | Endpoint | Description | Auth |
 |---------|----------|-------------|------|
-| `GET` | `/api/tasks` | Lister les taches actives | Oui |
-| `GET` | `/api/tasks/{id}` | Detail d'une tache | Oui |
-| `POST` | `/api/tasks` | Creer une tache (seul `name` est requis) | Oui |
-| `PUT` | `/api/tasks/{id}` | Modifier une tache | Oui |
-| `DELETE` | `/api/tasks/{id}` | Supprimer une tache | Oui |
+| `GET` | `/api/v1/tasks` | Lister les taches actives | Oui |
+| `GET` | `/api/v1/tasks/{id}` | Detail d'une tache | Oui |
+| `POST` | `/api/v1/tasks` | Creer une tache (seul `name` est requis) | Oui |
+| `PUT` | `/api/v1/tasks/{id}` | Modifier une tache | Oui |
+| `DELETE` | `/api/v1/tasks/{id}` | Archiver une tache | Oui |
 
 > Creation rapide : seul le champ `name` est obligatoire. Valeurs par defaut : `spoonCost=2`, `importance=MEDIUM`, `dueDate=aujourd'hui`.
 
@@ -151,10 +187,9 @@ Les endpoints proteges necessitent le header : `Authorization: Bearer <token>`
 
 | Methode | Endpoint | Description | Auth |
 |---------|----------|-------------|------|
-| `GET` | `/api/energy/today` | Energie declaree aujourd'hui | Oui |
-| `POST` | `/api/energy` | Declarer l'energie du jour (0-12 cuilleres) | Oui |
-| `PUT` | `/api/energy/today` | Reevaluer les cuilleres en cours de journee | Oui |
-| `PATCH` | `/api/energy/today/mood` | Enregistrer l'humeur de fin de journee | Oui |
+| `GET` | `/api/v1/energy/today` | Energie declaree aujourd'hui | Oui |
+| `POST` | `/api/v1/energy` | Declarer l'energie du jour (0-12 cuilleres) | Oui |
+| `PUT` | `/api/v1/energy/today` | Reevaluer les cuilleres en cours de journee | Oui |
 
 > Si l'energie declaree est **0**, toutes les taches actives sont automatiquement reportees au lendemain.
 
@@ -162,35 +197,36 @@ Les endpoints proteges necessitent le header : `Authorization: Bearer <token>`
 
 | Methode | Endpoint | Description | Auth |
 |---------|----------|-------------|------|
-| `GET` | `/api/task-logs` | Logs du jour (`?include_archived=true` pour inclure les archives) | Oui |
-| `POST` | `/api/task-logs` | Creer des logs en masse (statut PLANNED) | Oui |
-| `POST` | `/api/task-logs/manual` | Creer un log manuel | Oui |
-| `PATCH` | `/api/task-logs/{id}/status` | Changer le statut d'un log | Oui |
-| `POST` | `/api/task-logs/bulk-postpone` | Reporter toutes les taches PLANNED | Oui |
+| `GET` | `/api/v1/task-logs` | Logs du jour (`?include_archived=true` pour les archives, `?from=YYYY-MM-DD&to=YYYY-MM-DD` pour une plage / vue calendrier) | Oui |
+| `POST` | `/api/v1/task-logs` | Creer des logs en masse (statut PLANNED) | Oui |
+| `POST` | `/api/v1/task-logs/manual` | Creer un log manuel | Oui |
+| `PATCH` | `/api/v1/task-logs/{id}/status` | Changer le statut d'un log | Oui |
+| `POST` | `/api/v1/task-logs/bulk-postpone` | Reporter toutes les taches PLANNED | Oui |
 
 ### Suggestions
 
 | Methode | Endpoint | Description | Auth |
 |---------|----------|-------------|------|
-| `GET` | `/api/suggestions` | Obtenir les suggestions du jour (classees par score) | Oui |
+| `GET` | `/api/v1/suggestions` | Obtenir les suggestions du jour (classees par score) | Oui |
 
 ### Taches predefinies (Catalogue)
 
 | Methode | Endpoint | Description | Auth |
 |---------|----------|-------------|------|
-| `GET` | `/api/base-tasks` | Lister le catalogue de taches predefinies (`?category=`, `?locale=`) | Non |
+| `GET` | `/api/v1/base-tasks` | Lister le catalogue de taches predefinies (`?category=`, `?locale=`) | Oui |
 
 ### Messages bienveillants
 
 | Methode | Endpoint | Description | Auth |
 |---------|----------|-------------|------|
-| `GET` | `/api/messages/random` | Message aleatoire par contexte (`?context=`, `?locale=`) | Non |
+| `GET` | `/api/v1/messages/random` | Message aleatoire par contexte (`?context=`, `?locale=`) | Oui |
 
 ### Utilisateurs
 
 | Methode | Endpoint | Description | Auth |
 |---------|----------|-------------|------|
-| `DELETE` | `/api/users/me` | Supprimer mon compte et toutes mes donnees (RGPD) | Oui |
+| `GET` | `/api/v1/users/me/export` | Exporter toutes mes donnees personnelles (RGPD, Art. 15 & 20) | Oui |
+| `DELETE` | `/api/v1/users/me` | Supprimer mon compte et toutes mes donnees (RGPD) | Oui |
 
 ## Base de donnees
 
@@ -207,29 +243,46 @@ Les endpoints proteges necessitent le header : `Authorization: Bearer <token>`
 
 Les migrations sont gerees par **Flyway** dans `src/main/resources/db/migration/`.
 
+### Retention des donnees (RGPD)
+
+Un job planifie (`DataRetentionScheduler`) s'execute **tous les jours a 3h00** et
+supprime definitivement les comptes inactifs depuis plus de **24 mois** (derniere
+connexion ou, a defaut, date de creation).
+
 ## Tests
 
 ```bash
-# Lancer tous les tests
-./mvnw test
-
-# Lancer les tests avec le rapport
-./mvnw test -Dmaven.test.failure.ignore=false
+# Lancer les tests, produire le rapport JaCoCo et verifier le seuil de couverture
+./mvnw verify
 ```
 
-Les tests utilisent une base **H2 en memoire**.
+La suite locale utilise **H2 en memoire**. La CI rejoue egalement toute la suite
+contre **PostgreSQL 16** afin de valider Flyway, les contraintes, la concurrence
+et les transactions sur le moteur cible. Le rapport local est genere dans
+`target/site/jacoco/` et le build exige au moins 70 % de lignes couvertes.
 
 ## Docker
 
 ### Developpement (base de donnees uniquement)
 
 ```bash
-docker-compose up -d
+docker-compose up -d db adminer
 ```
 
 Services lances :
 - **PostgreSQL 16** sur le port `5432`
 - **Adminer** sur le port `8081` (interface web pour la BDD)
+
+### Stack complete (BDD + backend + Adminer)
+
+```bash
+docker-compose up -d
+```
+
+Lance en plus le **backend** (profil `docker`) sur le port `8080`.
+
+> ⚠️ Ne lancez pas `./mvnw spring-boot:run` en parallele de la stack complete :
+> le port `8080` serait deja occupe par le conteneur backend.
 
 ### Build de l'image de production
 
@@ -237,13 +290,20 @@ Services lances :
 # Build multi-stage (JDK 21 -> JRE 21 Alpine)
 docker build -t spoony-backend:latest .
 
-# Lancer le conteneur
-docker run -p 8080:8080 --env-file .env spoony-backend
+# Lancer le conteneur avec le profil prod et un fichier d'env de production
+# (DATABASE_URL vers la vraie BDD, JWT_SECRET fort, CORS_ALLOWED_ORIGINS, etc.)
+docker run -p 8080:8080 --env-file .env.prod \
+  -e SPRING_PROFILES_ACTIVE=prod spoony-backend
 ```
+
+> Le profil `prod` exige `CORS_ALLOWED_ORIGINS` (pas de defaut) et desactive
+> Swagger UI et la doc OpenAPI.
 
 ## Documentation API interactive
 
-Une fois l'application lancee, la documentation Swagger est accessible sur :
+Une fois l'application lancee (profils `dev` ou `docker`), la documentation Swagger est accessible sur :
 
 - **Swagger UI** : `http://localhost:8080/swagger-ui.html`
-- **OpenAPI JSON** : `http://localhost:8080/v3/api-docs`
+- **OpenAPI JSON** : `http://localhost:8080/api-docs`
+
+> En profil `prod`, Swagger UI et la doc OpenAPI sont desactives.

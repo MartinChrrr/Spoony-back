@@ -1,0 +1,69 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+exec > >(tee -a /var/log/spoony-bootstrap.log) 2>&1
+
+# Amazon Linux 2023 already ships curl-minimal, which provides the `curl`
+# command. Installing the full curl package conflicts with curl-minimal on a
+# fresh instance and aborts cloud-init before Docker is installed.
+dnf install -y docker jq util-linux xfsprogs
+systemctl enable --now docker
+systemctl enable --now amazon-ssm-agent
+
+install -d -m 0755 /usr/local/lib/docker/cli-plugins
+curl --fail --silent --show-error --location \
+  "https://github.com/docker/compose/releases/download/${compose_version}/docker-compose-linux-aarch64" \
+  --output /usr/local/lib/docker/cli-plugins/docker-compose
+echo "${compose_sha256}  /usr/local/lib/docker/cli-plugins/docker-compose" | sha256sum --check
+chmod 0755 /usr/local/lib/docker/cli-plugins/docker-compose
+
+data_device="/dev/disk/by-id/nvme-Amazon_Elastic_Block_Store_${data_volume_device_id}"
+for _ in $(seq 1 60); do
+  if [[ -b "$data_device" ]]; then
+    break
+  fi
+  sleep 5
+done
+
+if [[ ! -b "$data_device" ]]; then
+  echo "Persistent EBS data volume did not appear" >&2
+  exit 1
+fi
+
+if ! blkid "$data_device" >/dev/null 2>&1; then
+  mkfs.xfs "$data_device"
+fi
+
+data_uuid=$(blkid -s UUID -o value "$data_device")
+install -d -m 0755 /srv/spoony
+if ! grep -q "UUID=$data_uuid" /etc/fstab; then
+  echo "UUID=$data_uuid /srv/spoony xfs defaults,nofail 0 2" >> /etc/fstab
+fi
+mount /srv/spoony
+
+install -d -m 0700 /srv/spoony/postgres
+install -d -m 0755 /srv/spoony/caddy-data /srv/spoony/caddy-config
+install -d -m 0700 /srv/spoony/backups
+install -d -m 0755 /opt/spoony/releases
+install -d -m 0700 /opt/spoony/secrets
+
+cat >/etc/systemd/system/spoony-docker.service <<'UNIT'
+[Unit]
+Description=Spoony Docker Compose stack
+Requires=docker.service srv-spoony.mount
+After=docker.service network-online.target srv-spoony.mount
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/spoony
+ExecStart=/usr/bin/docker compose -f docker-compose.production.yml up -d
+ExecStop=/usr/bin/docker compose -f docker-compose.production.yml down
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+touch /var/lib/spoony-bootstrap-complete

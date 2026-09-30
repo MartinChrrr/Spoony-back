@@ -1,0 +1,11 @@
+services:
+  db:
+    volumes:
+      - test_postgres_data:/var/lib/postgresql/data
+
+  app:
+    ports:
+      - "18080:8080"
+
+volumes:
+  test_postgres_data:

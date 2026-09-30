@@ -5,16 +5,67 @@ spring:
     password: ${DATABASE_PASSWORD}
     hikari:
       maximum-pool-size: 10
-  
+      minimum-idle: 5
+      idle-timeout: 300000
+      max-lifetime: 600000
+      connection-timeout: 20000
+
   jpa:
     show-sql: false
     hibernate:
       ddl-auto: validate
+    properties:
+      hibernate:
+        format_sql: false
+
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+  flyway:
+    # The common application.yml sets baseline-on-migrate=true (convenient for dev
+    # on a pre-existing DB). In prod the target RDS must be EMPTY on first boot so
+    # V1..V7 apply cleanly — refuse any silent baselining that would skip migrations.
+    baseline-on-migrate: false
 
 jwt:
   secret: ${JWT_SECRET}
-  expiration: ${JWT_EXPIRATION:3600000}
+  access-expiration: ${JWT_ACCESS_EXPIRATION:900000}
+  refresh-expiration: ${JWT_REFRESH_EXPIRATION:604800000}
+
+app:
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS}
+
+server:
+  shutdown: graceful
+  # Behind the ALB, honour X-Forwarded-* so the app sees the real client IP and
+  # scheme. Without this, the rate limiter keys on the ALB's IP (one shared bucket
+  # for every user => self-inflicted DoS on /api/auth/**) and isSecure()/HSTS break.
+  forward-headers-strategy: framework
+  tomcat:
+    threads:
+      max: 200
+    accept-count: 100
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
 
 logging:
   level:
     com.spoony: INFO
+    org.springframework.security: WARN
+    org.hibernate.SQL: WARN
+
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false

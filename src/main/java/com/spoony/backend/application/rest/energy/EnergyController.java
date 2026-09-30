@@ -1,0 +1,80 @@
+package com.spoony.backend.application.rest.energy;
+
+import com.spoony.backend.application.energy.EnergyApplicationService;
+import com.spoony.backend.application.rest.common.JSendResponse;
+import com.spoony.backend.domain.energy.model.DailyEnergy;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.util.UUID;
+
+@RestController
+@RequestMapping(value = {"/api/v1/energy", "/api/energy"}, produces = MediaType.APPLICATION_JSON_VALUE)
+@Tag(name = "Energy", description = "Gestion de l'énergie quotidienne (cuillères)")
+public class EnergyController {
+
+    private final EnergyApplicationService energyApplicationService;
+
+    public EnergyController(EnergyApplicationService energyApplicationService) {
+        this.energyApplicationService = energyApplicationService;
+    }
+
+    @GetMapping("/today")
+    @Operation(summary = "Énergie du jour", description = "Retourne l'énergie déclarée pour aujourd'hui")
+    @ApiResponse(responseCode = "200", description = "Énergie trouvée")
+    @ApiResponse(responseCode = "404", description = "Énergie non déclarée")
+    public ResponseEntity<JSendResponse<EnergyResponse>> getToday() {
+        UUID userId = getCurrentUserId();
+        DailyEnergy energy = energyApplicationService.getTodayEnergy(userId);
+        return ResponseEntity.ok(JSendResponse.success(EnergyResponse.fromDomain(energy)));
+    }
+
+    @PostMapping
+    @Operation(
+            summary = "Déclarer l'énergie du jour",
+            description = "Déclare le nombre de cuillères pour aujourd'hui. Si 0, toutes les tâches actives sont reportées à demain."
+    )
+    @ApiResponse(responseCode = "201", description = "Énergie déclarée")
+    @ApiResponse(responseCode = "409", description = "Énergie déjà déclarée")
+    @ApiResponse(responseCode = "400", description = "Erreur de validation")
+    public ResponseEntity<JSendResponse<EnergyResponse>> declare(
+            @Valid @RequestBody DeclareEnergyRequest request) {
+        UUID userId = getCurrentUserId();
+        DailyEnergy energy = energyApplicationService.declareEnergy(request.getSpoons(), userId);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(JSendResponse.success(EnergyResponse.fromDomain(energy)));
+    }
+
+    @PutMapping("/today")
+    @Operation(
+            summary = "Réévaluer les cuillères",
+            description = "Met à jour le nombre de cuillères en cours de journée (réévaluation mi-journée)"
+    )
+    @ApiResponse(responseCode = "200", description = "Cuillères mises à jour")
+    @ApiResponse(responseCode = "404", description = "Énergie non déclarée")
+    @ApiResponse(responseCode = "400", description = "Erreur de validation")
+    public ResponseEntity<JSendResponse<EnergyResponse>> updateSpoons(
+            @Valid @RequestBody UpdateSpoonsRequest request) {
+        UUID userId = getCurrentUserId();
+        DailyEnergy energy = energyApplicationService.updateSpoons(request.getSpoons(), userId);
+        return ResponseEntity.ok(JSendResponse.success(EnergyResponse.fromDomain(energy)));
+    }
+
+    private UUID getCurrentUserId() {
+        String principal = (String) SecurityContextHolder.getContext()
+                .getAuthentication().getPrincipal();
+        return UUID.fromString(principal);
+    }
+}
