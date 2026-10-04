@@ -1,0 +1,6 @@
+# Repository owner approval for delivery and regression-sensitive files.
+/.github/ @MartinChrrr
+/src/test/ @MartinChrrr
+/infra/tests/ @MartinChrrr
+/infra-ec2/tests/ @MartinChrrr
+/pom.xml @MartinChrrr

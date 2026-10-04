@@ -1,0 +1,15 @@
+target/
+.git/
+.gitignore
+.docs/
+*.md
+.idea/
+*.iml
+.vscode/
+.claude/
+# Never bake local secrets or infra/compose into the image build context.
+.env
+.env.*
+docker-compose.yml
+infra/
+infra-ec2/

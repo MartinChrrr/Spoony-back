@@ -1,0 +1,146 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+  pull_request:
+    branches: [main, dev]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build, test and scan
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 21 (Temurin)
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Make mvnw executable
+        run: chmod +x mvnw
+
+      - name: Run tests (mvnw verify)
+        run: ./mvnw verify -B
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+
+      - name: Build Docker image (no push)
+        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        with:
+          context: .
+          file: ./Dockerfile
+          push: false
+          load: false
+          tags: spoony-backend:ci
+          cache-from: type=gha,scope=spoony-backend
+          cache-to: type=gha,mode=max,scope=spoony-backend
+
+      - name: Scan secrets with gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  postgres-integration:
+    name: PostgreSQL 16 integration tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: spoony_test
+          POSTGRES_USER: spoony_test
+          POSTGRES_PASSWORD: spoony_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U spoony_test -d spoony_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://localhost:5432/spoony_test
+      SPRING_DATASOURCE_USERNAME: spoony_app_ci
+      SPRING_DATASOURCE_PASSWORD: spoony_app_ci_password
+      SPRING_DATASOURCE_DRIVER_CLASS_NAME: org.postgresql.Driver
+      SPRING_FLYWAY_ENABLED: 'false'
+      SPRING_JPA_SHOW_SQL: 'false'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Java 21 (Temurin)
+        uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: Package the one-shot migration runner
+        run: ./mvnw package -B -DskipTests
+
+      - name: Bootstrap DB roles and run Flyway
+        env:
+          DATABASE_URL: jdbc:postgresql://localhost:5432/spoony_test
+          DATABASE_ADMIN_USER: spoony_test
+          DATABASE_ADMIN_PASSWORD: spoony_test
+          DATABASE_MIGRATION_USER: spoony_migrator_ci
+          DATABASE_MIGRATION_PASSWORD: spoony_migrator_ci_password
+          DATABASE_APP_USER: spoony_app_ci
+          DATABASE_APP_PASSWORD: spoony_app_ci_password
+        run: >-
+          java -cp target/spoony-backend-*.jar
+          -Dloader.main=com.spoony.backend.infrastructure.migration.DatabaseMigrationApplication
+          org.springframework.boot.loader.launch.PropertiesLauncher
+
+      - name: Run tests against PostgreSQL 16 as the runtime role
+        run: ./mvnw verify -B
+
+  terraform:
+    name: Terraform format and validation
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+        with:
+          terraform_version: '1.10.5'
+
+      - name: Check formatting
+        run: terraform fmt -check -recursive infra infra-ec2
+
+      - name: Validate archived ECS/RDS stack
+        working-directory: infra
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+
+      - name: Validate and test active EC2 stack
+        working-directory: infra-ec2
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate
+          terraform test
+
+      - name: Validate state bucket bootstrap
+        working-directory: infra-ec2/bootstrap
+        run: |
+          terraform init -backend=false -input=false
+          terraform validate

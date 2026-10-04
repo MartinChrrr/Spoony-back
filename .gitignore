@@ -36,3 +36,19 @@ build/
 .env.local
 .env.production
 .docs/
+
+### Terraform ###
+# State holds the generated DB password + JWT secret in clear text — never commit.
+*.tfstate
+*.tfstate.*
+*.tfplan
+.terraform/
+crash.log
+crash.*.log
+# Real variable values (copied from terraform.tfvars.example).
+infra/terraform.tfvars
+infra/backend-prod.hcl
+infra-ec2/terraform.tfvars
+infra-ec2/backend-prod.hcl
+infra-ec2/bootstrap/terraform.tfvars
+# Keep the provider lock file (.terraform.lock.hcl) versioned.

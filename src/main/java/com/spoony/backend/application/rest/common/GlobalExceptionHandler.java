@@ -1,0 +1,157 @@
+package com.spoony.backend.application.rest.common;
+
+import com.spoony.backend.domain.shared.exception.BusinessException;
+import com.spoony.backend.infrastructure.web.PayloadTooLargeException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.util.Map;
+
+@RestControllerAdvice
+public class GlobalExceptionHandler {
+
+    private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(BusinessException.class)
+    public ResponseEntity<JSendResponse<Map<String, String>>> handleBusinessException(BusinessException ex) {
+        log.warn("Business exception: code={} message={}", ex.getCode(), ex.getMessage());
+        return ResponseEntity
+                .status(ex.getHttpStatus())
+                .body(JSendResponse.fail(ex.getCode(), ex.getMessage()));
+    }
+
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<JSendResponse<Map<String, String>>> handleValidationException(
+            MethodArgumentNotValidException ex) {
+        String field = ex.getBindingResult().getFieldErrors().stream()
+                .findFirst()
+                .map(error -> error.getField())
+                .orElse(null);
+
+        String message = ex.getBindingResult().getFieldErrors().stream()
+                .findFirst()
+                .map(error -> error.getDefaultMessage())
+                .orElse("Erreur de validation");
+
+        log.warn("Validation error: field={} message={}", field, message);
+
+        if (field != null) {
+            return ResponseEntity
+                    .badRequest()
+                    .body(JSendResponse.fail("VALIDATION_ERROR", message, field));
+        }
+        return ResponseEntity
+                .badRequest()
+                .body(JSendResponse.fail("VALIDATION_ERROR", message));
+    }
+
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<JSendResponse<Map<String, String>>> handleIllegalArgumentException(IllegalArgumentException ex) {
+        log.warn("Invalid argument: {}", ex.getMessage());
+        return ResponseEntity
+                .badRequest()
+                .body(JSendResponse.fail("INVALID_VALUE", "Une valeur fournie n'est pas reconnue."));
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<JSendResponse<Map<String, String>>> handleMalformedJson(
+            HttpMessageNotReadableException ex) {
+        if (hasCause(ex, PayloadTooLargeException.class)) {
+            log.warn("Rejected oversized request body");
+            return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE)
+                    .body(JSendResponse.fail("PAYLOAD_TOO_LARGE", "Le corps de la requête est trop volumineux."));
+        }
+        log.warn("Malformed JSON request: {}", ex.getMessage());
+        return ResponseEntity.badRequest()
+                .body(JSendResponse.fail("MALFORMED_JSON", "Le corps de la requête est invalide ou mal formé"));
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<JSendResponse<Map<String, String>>> handleMissingParam(
+            MissingServletRequestParameterException ex) {
+        log.warn("Missing required parameter: {}", ex.getParameterName());
+        return ResponseEntity.badRequest()
+                .body(JSendResponse.fail("MISSING_PARAMETER",
+                        "Paramètre obligatoire manquant : " + ex.getParameterName()));
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<JSendResponse<Map<String, String>>> handleUnsupportedMediaType(
+            HttpMediaTypeNotSupportedException ex) {
+        log.warn("Unsupported media type: {}", ex.getContentType());
+        return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
+                .body(JSendResponse.fail("UNSUPPORTED_MEDIA_TYPE",
+                        "Content-Type non supporté. Utilisez application/json"));
+    }
+
+    /**
+     * Maps a DB unique-constraint violation to a clean 409 instead of letting it
+     * fall through to the generic 500. Covers the two UNIQUE(..., date)
+     * constraints: user_task_logs(user_task_id, date) — a duplicate day log — and
+     * daily_energy(user_id, date) — energy already declared. Constraint names are
+     * Postgres defaults; we also match on the column pair as a fallback.
+     */
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<JSendResponse<Map<String, String>>> handleDataIntegrityViolation(
+            DataIntegrityViolationException ex) {
+        String cause = ex.getMostSpecificCause().getMessage();
+        String hint = cause == null ? "" : cause.toLowerCase();
+
+        String code = "DUPLICATE_RESOURCE";
+        String message = "Cette ressource existe déjà.";
+        if (hint.contains("user_task_logs_user_task_id_date_key")
+                || (hint.contains("user_task_id") && hint.contains("date"))) {
+            code = "TASK_LOG_ALREADY_EXISTS";
+            message = "Cette tâche a déjà un suivi pour cette date.";
+        } else if (hint.contains("daily_energy_user_id_date_key")
+                || (hint.contains("user_id") && hint.contains("date"))) {
+            code = "ENERGY_ALREADY_DECLARED";
+            message = "L'énergie a déjà été déclarée pour cette date.";
+        } else if (hint.contains("ck_daily_energy_spoons_used_non_negative")) {
+            code = "SPOON_BALANCE_CONFLICT";
+            message = "Le compteur de cuillères ne peut pas devenir négatif.";
+        }
+
+        log.warn("Data integrity violation: code={} cause={}", code, cause);
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(JSendResponse.fail(code, message));
+    }
+
+    @ExceptionHandler(OptimisticLockingFailureException.class)
+    public ResponseEntity<JSendResponse<Map<String, String>>> handleOptimisticLockingFailure(
+            OptimisticLockingFailureException ex) {
+        log.warn("Concurrent task log modification: {}", ex.getMessage());
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(JSendResponse.fail("CONCURRENT_MODIFICATION",
+                        "Ce suivi a été modifié sur un autre appareil. Rechargez les données puis réessayez."));
+    }
+
+    @ExceptionHandler(Exception.class)
+    public ResponseEntity<JSendResponse<Void>> handleGenericException(Exception ex) {
+        log.error("Unexpected error", ex);
+        return ResponseEntity
+                .internalServerError()
+                .body(JSendResponse.error("Une erreur inattendue est survenue"));
+    }
+
+    private boolean hasCause(Throwable throwable, Class<? extends Throwable> causeType) {
+        Throwable current = throwable;
+        while (current != null) {
+            if (causeType.isInstance(current)) {
+                return true;
+            }
+            current = current.getCause();
+        }
+        return false;
+    }
+}

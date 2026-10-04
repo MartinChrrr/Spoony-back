@@ -1,0 +1,1 @@
+- [Project structure](project_structure.md) — Real Java package is `com.spoony.backend` (not `com.spoony.spoony_backend`); key source paths
