@@ -128,6 +128,7 @@ class DefaultSuggestionStrategyTest {
 
         List<Suggestion> result = strategy.suggest(List.of(t1, t2), 10, Map.of());
 
+        assertThat(result).isNotEmpty();
         assertThat(result).allSatisfy(s -> assertThat(s.isExceedsBudget()).isFalse());
     }
 
