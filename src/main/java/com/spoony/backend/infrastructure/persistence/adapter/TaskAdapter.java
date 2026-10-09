@@ -8,6 +8,7 @@ import com.spoony.backend.infrastructure.persistence.mapper.TaskMapper;
 import com.spoony.backend.infrastructure.persistence.repository.JpaUserTaskRepository;
 import org.springframework.stereotype.Component;
 
+import java.time.Clock;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -17,9 +18,11 @@ import java.util.UUID;
 public class TaskAdapter implements TaskPort {
 
     private final JpaUserTaskRepository userTaskRepository;
+    private final Clock businessClock;
 
-    public TaskAdapter(JpaUserTaskRepository userTaskRepository) {
+    public TaskAdapter(JpaUserTaskRepository userTaskRepository, Clock businessClock) {
         this.userTaskRepository = userTaskRepository;
+        this.businessClock = businessClock;
     }
 
     @Override
@@ -44,7 +47,7 @@ public class TaskAdapter implements TaskPort {
 
     @Override
     public UserTask save(UserTask task) {
-        UserTaskEntity entity = TaskMapper.toEntity(task);
+        UserTaskEntity entity = TaskMapper.toEntity(task, businessClock);
         UserTaskEntity saved = userTaskRepository.save(entity);
         return TaskMapper.toDomain(saved);
     }
@@ -52,7 +55,7 @@ public class TaskAdapter implements TaskPort {
     @Override
     public List<UserTask> saveAll(List<UserTask> tasks) {
         List<UserTaskEntity> entities = tasks.stream()
-                .map(TaskMapper::toEntity)
+                .map(task -> TaskMapper.toEntity(task, businessClock))
                 .toList();
         List<UserTaskEntity> saved = userTaskRepository.saveAll(entities);
         return saved.stream()

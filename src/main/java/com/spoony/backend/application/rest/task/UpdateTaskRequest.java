@@ -39,6 +39,7 @@ public class UpdateTaskRequest {
     private String notes;
 
     public UpdateTaskRequest() {
+        // Required by Jackson for JSON deserialization.
     }
 
     public UserTask toDomain() {

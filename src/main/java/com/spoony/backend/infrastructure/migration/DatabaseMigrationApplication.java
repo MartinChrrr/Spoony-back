@@ -1,6 +1,8 @@
 package com.spoony.backend.infrastructure.migration;
 
 import org.flywaydb.core.Flyway;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.sql.Connection;
 import java.sql.DriverManager;
@@ -19,6 +21,8 @@ import java.util.regex.Pattern;
  * that receives the database administrator and Flyway migration secrets.</p>
  */
 public final class DatabaseMigrationApplication {
+
+    private static final Logger log = LoggerFactory.getLogger(DatabaseMigrationApplication.class);
 
     private static final Pattern POSTGRES_IDENTIFIER =
             Pattern.compile("[A-Za-z][A-Za-z0-9_]{0,62}");
@@ -53,7 +57,7 @@ public final class DatabaseMigrationApplication {
                 .migrate();
 
         grantRuntimePrivileges(url, migrationUser, migrationPassword, appUser);
-        System.out.println("Database bootstrap and Flyway migrations completed successfully");
+        log.info("Database bootstrap and Flyway migrations completed successfully");
     }
 
     private static void prepareRoles(String url,

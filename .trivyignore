@@ -1,0 +1,14 @@
+# CVE-2026-47884 is reported through the transitive spring-webmvc jar.
+#
+# The Spring advisory requires all of these conditions: use of XsltView,
+# an "/**" mapping that renders a view, and no explicit view name. This
+# service exposes JSON @RestController endpoints only and has no XsltView,
+# ViewResolver, or MVC view configuration. The vulnerable code path is not
+# reachable in the current application architecture.
+#
+# Reassess and remove this exception before introducing server-rendered views,
+# or when migrating to the Spring Boot 4 / Spring Framework 7 OSS line. Keep
+# this exception visible so a future dependency refresh does not silently
+# turn it into an unreviewed security waiver.
+# exp: 2026-12-31
+CVE-2026-47884

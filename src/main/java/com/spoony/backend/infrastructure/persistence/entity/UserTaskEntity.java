@@ -10,11 +10,14 @@ import jakarta.persistence.Table;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.UUID;
 
 @Entity
 @Table(name = "user_tasks")
 public class UserTaskEntity extends BaseEntity {
+
+    private static final ZoneId BUSINESS_ZONE = ZoneId.of("Europe/Paris");
 
     @Column(name = "user_id", nullable = false)
     private UUID userId;
@@ -35,7 +38,7 @@ public class UserTaskEntity extends BaseEntity {
     private String notes;
 
     @Column(name = "due_date", nullable = false)
-    private LocalDate dueDate = LocalDate.now();
+    private LocalDate dueDate = LocalDate.now(BUSINESS_ZONE);
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
