@@ -15,6 +15,7 @@ public class BulkPostponeResponse {
     private LocalDate newDate;
 
     public BulkPostponeResponse() {
+        // Required by Jackson for JSON deserialization.
     }
 
     public static BulkPostponeResponse fromDomain(BulkPostponeResult result) {
