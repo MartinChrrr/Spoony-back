@@ -32,6 +32,7 @@ public class EnergyResponse {
     private LocalDateTime updatedAt;
 
     public EnergyResponse() {
+        // Required by Jackson for JSON deserialization.
     }
 
     public static EnergyResponse fromDomain(DailyEnergy energy) {

@@ -27,6 +27,7 @@ public class SuggestionResponse {
     private boolean exceedsBudget;
 
     public SuggestionResponse() {
+        // Required by Jackson for JSON deserialization.
     }
 
     public static SuggestionResponse fromDomain(Suggestion suggestion) {

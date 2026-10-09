@@ -7,6 +7,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -76,7 +77,8 @@ public class DefaultSuggestionStrategy implements SuggestionStrategy {
         if (last == null) {
             return 30; // never completed → treat as 30 days
         }
-        return ChronoUnit.DAYS.between(last, LocalDateTime.now(clock));
+        Instant lastInstant = last.atZone(clock.getZone()).toInstant();
+        return ChronoUnit.DAYS.between(lastInstant, Instant.now(clock));
     }
 
     double computeFrequencyWeight(long daysSinceCompletion) {

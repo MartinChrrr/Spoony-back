@@ -41,6 +41,7 @@ public class TaskLogResponse {
     private LocalDateTime updatedAt;
 
     public TaskLogResponse() {
+        // Required by Jackson for JSON deserialization.
     }
 
     public static TaskLogResponse fromDomain(UserTaskLog log) {
