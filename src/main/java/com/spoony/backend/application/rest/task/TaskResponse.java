@@ -44,6 +44,7 @@ public class TaskResponse {
     private LocalDateTime updatedAt;
 
     public TaskResponse() {
+        // Required by Jackson for JSON deserialization.
     }
 
     public static TaskResponse fromDomain(UserTask task) {

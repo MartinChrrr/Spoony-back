@@ -112,7 +112,7 @@ public class TaskLogService implements TaskLogUseCase {
         taskLog.setSuggested(false);
 
         UserTaskLog saved = taskLogPort.save(taskLog);
-        log.info("Manual task log created userId={} taskId={}", userId, userTaskId);
+        log.info("Manual task log created");
         return saved;
     }
 
@@ -182,7 +182,7 @@ public class TaskLogService implements TaskLogUseCase {
             throw new NoActiveTasksException();
         }
 
-        log.info("Bulk postpone userId={} count={} newDate={}", userId, count, newDate);
+        log.info("Bulk postpone completed count={}", count);
         return new BulkPostponeResult(count, newDate);
     }
 }

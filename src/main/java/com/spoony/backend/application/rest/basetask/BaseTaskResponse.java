@@ -24,6 +24,7 @@ public class BaseTaskResponse {
     private String category;
 
     public BaseTaskResponse() {
+        // Required by Jackson for JSON deserialization.
     }
 
     public static BaseTaskResponse fromEntity(BaseTaskEntity entity) {
