@@ -107,7 +107,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void should_Return400_When_MalformedJson() {
-        HttpMessageNotReadableException ex = new HttpMessageNotReadableException("bad json");
+        HttpMessageNotReadableException ex = new HttpMessageNotReadableException("bad json", null);
         ResponseEntity<JSendResponse<Map<String, String>>> response = handler.handleMalformedJson(ex);
 
         assertThat(response.getStatusCode().value()).isEqualTo(400);
