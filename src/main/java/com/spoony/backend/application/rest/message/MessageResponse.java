@@ -18,6 +18,7 @@ public class MessageResponse {
     private String context;
 
     public MessageResponse() {
+        // Required by Jackson for JSON deserialization.
     }
 
     public static MessageResponse fromEntity(BenevolentMessageEntity entity) {

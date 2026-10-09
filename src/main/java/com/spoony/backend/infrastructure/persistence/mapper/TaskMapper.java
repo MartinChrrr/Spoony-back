@@ -5,7 +5,9 @@ import com.spoony.backend.domain.task.model.TaskStatus;
 import com.spoony.backend.domain.task.model.UserTask;
 import com.spoony.backend.infrastructure.persistence.entity.UserTaskEntity;
 
+import java.time.Clock;
 import java.time.LocalDate;
+import java.time.ZoneId;
 
 public final class TaskMapper {
 
@@ -30,6 +32,10 @@ public final class TaskMapper {
     }
 
     public static UserTaskEntity toEntity(UserTask task) {
+        return toEntity(task, Clock.system(ZoneId.of("Europe/Paris")));
+    }
+
+    public static UserTaskEntity toEntity(UserTask task, Clock clock) {
         UserTaskEntity entity = new UserTaskEntity();
         entity.setId(task.getId());
         entity.setUserId(task.getUserId());
@@ -37,7 +43,7 @@ public final class TaskMapper {
         entity.setSpoonCost((short) (task.getSpoonCost() > 0 ? task.getSpoonCost() : 2));
         entity.setImportance(task.getImportance() != null ? task.getImportance().name() : "MEDIUM");
         entity.setCategory(task.getCategory());
-        entity.setDueDate(task.getDueDate() != null ? task.getDueDate() : LocalDate.now());
+        entity.setDueDate(task.getDueDate() != null ? task.getDueDate() : LocalDate.now(clock));
         entity.setNotes(task.getNotes());
         entity.setStatus(task.getStatus() != null ? task.getStatus() : TaskStatus.ACTIVE);
         entity.setCompletedAt(task.getCompletedAt());
