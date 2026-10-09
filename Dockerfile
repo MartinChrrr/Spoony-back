@@ -3,7 +3,7 @@
 # The Spring Boot jar is architecture-neutral: compile on the native CI
 # platform, then package it in the requested ARM64 runtime image. This avoids
 # running Maven under QEMU during a Graviton build.
-FROM --platform=$BUILDPLATFORM eclipse-temurin:21-jdk-alpine@sha256:0bfc69a4758a86710e5c474032d28400a8bd00874766f9e8b1642ac2fd293159 AS build
+FROM --platform=$BUILDPLATFORM eclipse-temurin:25-jdk-alpine@sha256:3fd2d245c4e0eba615fe366a71b8bd25f5db7104f53e4026b24bf508b880bd2a AS build
 WORKDIR /app
 COPY pom.xml .
 COPY mvnw .
@@ -16,7 +16,7 @@ COPY src ./src
 RUN --mount=type=cache,target=/root/.m2 \
     ./mvnw clean package -Dmaven.test.skip=true -B
 
-FROM --platform=$TARGETPLATFORM eclipse-temurin:21-jre-alpine@sha256:51ab5e3302e7141ce665ca3ea85e8b5cd648eafbc3c0c90dd79d6537684e4555
+FROM --platform=$TARGETPLATFORM eclipse-temurin:25-jre-alpine@sha256:3c0a9084927a221ccd1d007fcaf614465672c0af37aaa834c5184483afe56d61
 RUN addgroup -S spoony && adduser -S spoony -G spoony
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
